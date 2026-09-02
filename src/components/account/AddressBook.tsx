@@ -9,6 +9,7 @@ import { addressesApi } from "@/features/addresses/api/addresses.api";
 import { deliveryZonesApi } from "@/features/delivery-zones/api/delivery-zones.api";
 import { queryKeys } from "@/services/queryKeys";
 import { Button, Input, Modal } from "@/components/ui";
+import { PhoneDialCode } from "@/components/ui/PhoneDialCode";
 import { Spinner } from "@/components/ui/Loader";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { useToast } from "@/hooks/useToast";
@@ -18,6 +19,14 @@ import { stripKnownCallingCode } from "@/features/regions/countries";
 import { PencilIcon, PinIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import type { MessageKey } from "@/i18n";
 import { localizedName } from "@/features/location/localizedName";
+import {
+  PHONE_LTR_CLASS,
+  formatPhoneDigitsForDisplay,
+  handlePhoneInputChange,
+  handlePhoneKeyDown,
+  normalizePhoneDigits,
+  phoneNumberSchema,
+} from "@/lib/phoneInput";
 import type {
   ApiAddress,
   ApiAddressCreateInput,
@@ -31,11 +40,15 @@ const stripDialCode = stripKnownCallingCode;
 
 type TranslateFn = (key: MessageKey) => string;
 
-const makeAddressSchema = (t: TranslateFn, zoneRequired: boolean) =>
+const makeAddressSchema = (
+  t: TranslateFn,
+  zoneRequired: boolean,
+  nationalPhoneLength: number | null
+) =>
   z.object({
     label: z.string().optional(),
     fullName: z.string().min(1, t("validation.required")),
-    phone: z.string().min(4, t("validation.required")),
+    phone: phoneNumberSchema(t, nationalPhoneLength),
     area: z.string().min(1, t("validation.required")),
     deliveryZoneId: zoneRequired
       ? z.string().min(1, t("validation.required"))
@@ -230,7 +243,7 @@ function AddressFormModal({ open, onClose, initial, title }: AddressFormModalPro
   const toast = useToast();
   const queryClient = useQueryClient();
   const { t, locale: uiLocale } = useT();
-  const { countryCode, dialCode } = useCurrency();
+  const { countryCode, dialCode, phoneDigitLimit, nationalPhoneLength } = useCurrency();
   const regionCode = countryCode;
 
   const zonesQuery = useQuery({
@@ -253,13 +266,16 @@ function AddressFormModal({ open, onClose, initial, title }: AddressFormModalPro
     []
   );
 
-  const schema = useMemo(() => makeAddressSchema(t, zoneRequired), [t, zoneRequired]);
+  const schema = useMemo(
+    () => makeAddressSchema(t, zoneRequired, nationalPhoneLength),
+    [t, zoneRequired, nationalPhoneLength]
+  );
 
   const initialValues: FormValues | undefined = initial
     ? {
         label: initial.label ?? "",
         fullName: initial.fullName,
-        phone: stripDialCode(initial.phone),
+        phone: formatPhoneDigitsForDisplay(stripDialCode(initial.phone), uiLocale),
         area: initial.area ?? "",
         deliveryZoneId: initial.deliveryZoneId ?? "",
         isDefault: initial.isDefault,
@@ -276,6 +292,7 @@ function AddressFormModal({ open, onClose, initial, title }: AddressFormModalPro
     defaultValues: initialValues ?? emptyDefaults,
     values: initialValues ?? emptyDefaults,
   });
+  const phoneField = register("phone");
 
   // Reset to a blank form the next time this modal opens for "add new" (avoids
   // showing a just-closed edit's leftover values if the user immediately clicks
@@ -290,7 +307,7 @@ function AddressFormModal({ open, onClose, initial, title }: AddressFormModalPro
       const payload: ApiAddressCreateInput = {
         label: values.label?.trim() || null,
         fullName: values.fullName.trim(),
-        phone: `${dialCode}${values.phone.trim().replace(/[\s-]/g, "")}`,
+        phone: `${dialCode}${normalizePhoneDigits(values.phone).replace(/[\s-]/g, "")}`,
         area: values.area.trim(),
         deliveryZoneId: values.deliveryZoneId || null,
         isDefault: values.isDefault,
@@ -378,6 +395,7 @@ function AddressFormModal({ open, onClose, initial, title }: AddressFormModalPro
             {t("checkout.phone")}
           </label>
           <div
+            dir="ltr"
             className={
               "flex h-12 items-center rounded-2xl border bg-white transition-all " +
               (errors.phone
@@ -385,22 +403,20 @@ function AddressFormModal({ open, onClose, initial, title }: AddressFormModalPro
                 : "border-ink-200 focus-within:border-bloom-400 focus-within:ring-4 focus-within:ring-bloom-100")
             }
           >
-            <span className="flex h-full items-center border-e border-ink-200 px-3 text-sm font-medium text-ink-700">
-              {dialCode}
-            </span>
+            <PhoneDialCode dialCode={dialCode} />
             <input
               id="address-phone"
               type="tel"
               inputMode="numeric"
               autoComplete="tel-national"
-              className="h-full flex-1 rounded-e-2xl bg-transparent px-3 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none"
-              onKeyDown={(e) => {
-                const allowed = ["Backspace","Delete","Tab","Escape","Enter","ArrowLeft","ArrowRight","Home","End"];
-                if (!allowed.includes(e.key) && !/^[0-9\s-]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
-                  e.preventDefault();
-                }
-              }}
-              {...register("phone")}
+              dir="ltr"
+              maxLength={phoneDigitLimit}
+              className={`h-full min-w-0 flex-1 rounded-e-2xl bg-transparent px-3 text-start text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none ${PHONE_LTR_CLASS}`}
+              onKeyDown={(event) => handlePhoneKeyDown(event, phoneDigitLimit)}
+              {...phoneField}
+              onChange={(event) =>
+                handlePhoneInputChange(event, uiLocale, phoneField.onChange, phoneDigitLimit)
+              }
             />
           </div>
           {errors.phone?.message ? (

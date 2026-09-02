@@ -21,6 +21,7 @@ import { formatCurrency, formatDate, intlLocale } from "@/lib/format";
 import { getOrderDeliveryView } from "@/features/orders/delivery";
 import { useCurrency } from "@/features/location/hooks/useCurrency";
 import { useT } from "@/i18n/useT";
+import { localized } from "@/i18n";
 import { siteConfig } from "@/config/site";
 import { regionsApi } from "@/features/regions/api/regions.api";
 import { queryKeys } from "@/services/queryKeys";
@@ -433,14 +434,19 @@ export function ReceiptCard({ order }: { order: ApiOrder }) {
         </div>
 
         <ul className="divide-y divide-ink-100">
-          {order.items.map((item) => (
+          {order.items.map((item) => {
+            const productTitle = item.product
+              ? localized(item.product.title, item.product.title_ar, locale)
+              : t("order.itemFallback");
+
+            return (
             <li key={item.id} className={`${ITEM_COLS} py-3.5`}>
               <div className="flex min-w-0 flex-col gap-2">
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-blush-50 ring-1 ring-ink-100">
                   {item.selectedImage ?? item.product?.image ? (
                     <Image
                       src={(item.selectedImage ?? item.product?.image) as string}
-                      alt={item.product?.title ?? ""}
+                      alt={productTitle}
                       fill
                       sizes="64px"
                       className="object-cover"
@@ -449,7 +455,7 @@ export function ReceiptCard({ order }: { order: ApiOrder }) {
                 </div>
                 <div className="min-w-0">
                   <p className="wrap-break-word text-sm font-medium leading-snug text-ink-900">
-                    {item.product?.title ?? t("order.itemFallback")}
+                    {productTitle}
                   </p>
                   <SelectedOptions options={item.selectedOptions} className="mt-1" />
                   <OrderItemExtras
@@ -485,7 +491,8 @@ export function ReceiptCard({ order }: { order: ApiOrder }) {
                 {price(item.price * item.quantity)}
               </span>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </div>
 

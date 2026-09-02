@@ -22,14 +22,13 @@ import {
   MenuContent,
   MenuItem,
 } from "@/components/ui";
+import { PhoneDialCode } from "@/components/ui/PhoneDialCode";
 import { Spinner } from "@/components/ui/Loader";
 import { SelectedOptions } from "@/features/products/components/SelectedOptions";
 import { cartLineKey } from "@/features/cart/variantKey";
 import {
   ChevronRight,
   ChevronDown,
-  ShieldIcon,
-  TruckIcon,
   CheckIcon,
 } from "@/components/icons";
 import { cartApi } from "@/features/cart/api/cart.api";
@@ -56,6 +55,14 @@ import { useLocalizedHref } from "@/features/location/useLocalizedHref";
 import { STORAGE_KEYS } from "@/constants/storage-keys";
 import { storage } from "@/lib/storage";
 import { cn } from "@/lib/cn";
+import {
+  PHONE_LTR_CLASS,
+  formatPhoneDigitsForDisplay,
+  handlePhoneInputChange,
+  handlePhoneKeyDown,
+  normalizePhoneDigits,
+  phoneNumberSchema,
+} from "@/lib/phoneInput";
 import { useIsHydrated } from "@/hooks/useIsHydrated";
 import { useToast } from "@/hooks/useToast";
 import { ApiError } from "@/services/http";
@@ -158,14 +165,18 @@ function businessDateKey(daysFromNow: number): string {
 // different region than the one being viewed now.
 const stripDialCode = stripKnownCallingCode;
 
-const makeNewAddressSchema = (t: TranslateFn, zoneRequired: boolean) =>
+const makeNewAddressSchema = (
+  t: TranslateFn,
+  zoneRequired: boolean,
+  nationalPhoneLength: number | null
+) =>
   z.object({
     fullName: z.string().min(1, t("validation.required")),
     area: z.string().min(1, t("validation.required")),
     deliveryZoneId: zoneRequired
       ? z.string().min(1, t("validation.required"))
       : z.string().optional(),
-    phone: z.string().min(4, t("validation.required")),
+    phone: phoneNumberSchema(t, nationalPhoneLength),
     // Guests only (optional): enables the receipt email + links the order on
     // sign-up. Empty string is allowed; a non-empty value must be a valid email.
     email: z
@@ -192,7 +203,7 @@ export function CheckoutClient() {
   // token) fall straight through to the guest flow.
   const authHydrating =
     hydrated && !isAuthed && Boolean(storage.get<string>(STORAGE_KEYS.authToken));
-  const { currency, locale, countryName, countryCode, dialCode } = useCurrency();
+  const { currency, locale, countryName, countryCode, dialCode, phoneDigitLimit, nationalPhoneLength } = useCurrency();
   const regionCode = countryCode;
   // The city/emirate the customer already picked in the header's "Deliver to"
   // selector (a delivery zone's `name` — see location.slice.ts) — prefilled
@@ -272,8 +283,8 @@ export function CheckoutClient() {
   const zoneRequired = !zonesQuery.isPending && zones.length > 0;
 
   const newAddressSchema = useMemo(
-    () => makeNewAddressSchema(t, zoneRequired),
-    [t, zoneRequired]
+    () => makeNewAddressSchema(t, zoneRequired, nationalPhoneLength),
+    [t, zoneRequired, nationalPhoneLength]
   );
 
   const {
@@ -617,7 +628,7 @@ export function CheckoutClient() {
             fullName: inlineAddress.fullName,
             // Strip the spaces/dashes the input allows for readability — the
             // stored value should be one clean digit string, not "+97150 123-4567".
-            phone: `${dialCode}${inlineAddress.phone.replace(/[\s-]/g, "")}`,
+            phone: `${dialCode}${normalizePhoneDigits(inlineAddress.phone).replace(/[\s-]/g, "")}`,
             area: inlineAddress.area,
             deliveryZoneId: inlineAddress.deliveryZoneId || undefined,
           }
@@ -816,6 +827,7 @@ export function CheckoutClient() {
             regNewAddr={regNewAddr}
             newAddrErrors={newAddrErrors}
             dialCode={dialCode}
+            phoneDigitLimit={phoneDigitLimit}
             regionCode={regionCode}
             zones={zones}
             zonesLoading={zonesQuery.isPending}
@@ -963,6 +975,7 @@ interface BillingShippingCardProps {
   regNewAddr: ReturnType<typeof useForm<NewAddressValues>>["register"];
   newAddrErrors: ReturnType<typeof useForm<NewAddressValues>>["formState"]["errors"];
   dialCode: string;
+  phoneDigitLimit: number;
   regionCode: string;
   zones: DeliveryZoneOption[];
   zonesLoading: boolean;
@@ -982,6 +995,7 @@ function BillingShippingCard({
   regNewAddr,
   newAddrErrors,
   dialCode,
+  phoneDigitLimit,
   regionCode,
   zones,
   zonesLoading,
@@ -992,6 +1006,7 @@ function BillingShippingCard({
   submitError,
 }: BillingShippingCardProps) {
   const { t, locale: uiLocale } = useT();
+  const phoneField = regNewAddr("phone");
   return (
     <Card variant="flat" padding="lg" className="flex flex-col gap-5">
       <header>
@@ -1113,6 +1128,7 @@ function BillingShippingCard({
               {t("checkout.phone")}
             </label>
             <div
+              dir="ltr"
               className={
                 "flex h-12 items-center rounded-2xl border bg-white transition-all " +
                 (newAddrErrors.phone
@@ -1120,22 +1136,20 @@ function BillingShippingCard({
                   : "border-ink-200 focus-within:border-bloom-400 focus-within:ring-4 focus-within:ring-bloom-100")
               }
             >
-              <span className="flex h-full items-center border-e border-ink-200 px-3 text-sm font-medium text-ink-700">
-                {dialCode}
-              </span>
+              <PhoneDialCode dialCode={dialCode} />
               <input
                 id="checkout-phone"
                 type="tel"
                 inputMode="numeric"
                 autoComplete="tel-national"
-                className="h-full flex-1 rounded-e-2xl bg-transparent px-3 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none"
-                onKeyDown={(e) => {
-                  const allowed = ["Backspace","Delete","Tab","Escape","Enter","ArrowLeft","ArrowRight","Home","End"];
-                  if (!allowed.includes(e.key) && !/^[0-9\s-]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
-                    e.preventDefault();
-                  }
-                }}
-                {...regNewAddr("phone")}
+                dir="ltr"
+                maxLength={phoneDigitLimit}
+                className={`h-full min-w-0 flex-1 rounded-e-2xl bg-transparent px-3 text-start text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none ${PHONE_LTR_CLASS}`}
+                onKeyDown={(event) => handlePhoneKeyDown(event, phoneDigitLimit)}
+                {...phoneField}
+                onChange={(event) =>
+                  handlePhoneInputChange(event, uiLocale, phoneField.onChange, phoneDigitLimit)
+                }
               />
             </div>
             {newAddrErrors.phone?.message ? (
@@ -1756,7 +1770,6 @@ function OrderReviewCard({
               />
               <div>
                 <p className="font-medium text-ink-900">{t("checkout.payOnline")}</p>
-                <p className="text-sm text-ink-500">{t("checkout.payOnlineHint")}</p>
               </div>
             </label>
 
@@ -1778,7 +1791,6 @@ function OrderReviewCard({
                 />
                 <div>
                   <p className="font-medium text-ink-900">{t("checkout.cod")}</p>
-                  <p className="text-sm text-ink-500">{t("checkout.codAvailability")}</p>
                 </div>
               </label>
             ) : null}
@@ -1801,27 +1813,9 @@ function OrderReviewCard({
             />
             <div>
               <p className="font-medium text-ink-900">{t("checkout.cod")}</p>
-              <p className="text-sm text-ink-500">{t("checkout.codAvailability")}</p>
             </div>
           </div>
         )}
-
-        <div className="flex flex-col gap-1 text-sm text-ink-600">
-          <p className="inline-flex items-center gap-2">
-            <ShieldIcon size={16} className="text-bloom-700" />
-            {t("checkout.secureCheckout")}
-          </p>
-          <p className="inline-flex items-center gap-2">
-            <TruckIcon size={16} className="text-bloom-700" />
-            {shipping === 0 ? t("cart.freeDelivery") : t("checkout.deliveryNote")}
-          </p>
-          {deliveryConfig?.sameDayEnabled && deliveryConfig.sameDayCutoff ? (
-            <p className="inline-flex items-center gap-2">
-              <TruckIcon size={16} className="text-bloom-700" />
-              {t("checkout.sameDayLine", { cutoff: deliveryConfig.sameDayCutoff })}
-            </p>
-          ) : null}
-        </div>
 
         {/* Min/max order gates — mirrored from the resolved config; backend re-checks. */}
         {belowMinOrder && minOrderAmount != null ? (

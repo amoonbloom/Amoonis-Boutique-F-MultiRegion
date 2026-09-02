@@ -117,6 +117,26 @@ const CALLING_CODE_BY_ISO2: Record<string, string> = {
   ZW: "+263",
 };
 
+/** National significant number length (digits only, excluding country code). */
+const NATIONAL_PHONE_LENGTH_BY_ISO2: Record<string, number> = {
+  AE: 9,
+  SA: 9,
+};
+
+/** Max digits when no country-specific length is configured (ITU E.164 cap). */
+export const DEFAULT_MAX_PHONE_DIGITS = 15;
+
+/** Exact national digit count for a region's `iso2`, or null when unknown. */
+export function getNationalPhoneLength(iso2: string | null | undefined): number | null {
+  if (!iso2) return null;
+  return NATIONAL_PHONE_LENGTH_BY_ISO2[iso2.toUpperCase()] ?? null;
+}
+
+/** Hard input cap: exact national length when known, otherwise a safe default. */
+export function getPhoneDigitLimit(iso2: string | null | undefined): number {
+  return getNationalPhoneLength(iso2) ?? DEFAULT_MAX_PHONE_DIGITS;
+}
+
 /** All distinct calling codes in the map above, longest-first, so a prefix
  *  scan (see stripKnownCallingCode) matches the longest code before a
  *  shorter one that happens to also match (e.g. checks "+299" before "+2"). */

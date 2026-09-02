@@ -5,7 +5,7 @@ import { useAppSelector } from "@/store";
 import { regionsApi } from "@/features/regions/api/regions.api";
 import { queryKeys } from "@/services/queryKeys";
 import { intlLocale } from "@/lib/format";
-import { getCallingCode } from "@/features/regions/countries";
+import { getCallingCode, getNationalPhoneLength, getPhoneDigitLimit } from "@/features/regions/countries";
 import { useIsHydrated } from "@/hooks/useIsHydrated";
 
 /**
@@ -56,6 +56,8 @@ export function useCurrency() {
     countryName: region?.name ?? country,
     iso2: region?.iso2 ?? null,
     dialCode: getCallingCode(region?.iso2) ?? "",
+    nationalPhoneLength: getNationalPhoneLength(region?.iso2),
+    phoneDigitLimit: getPhoneDigitLimit(region?.iso2),
     // Per-region online-payment availability (drives the checkout payment selector).
     // Defaults are conservative: no online payment until the region is confirmed, but
     // both methods on once it is (matches the backend column defaults).

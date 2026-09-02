@@ -28,21 +28,26 @@ export default async function AboutPage() {
   const regionCopy = await regionCopyFromRegionCode(region, locale);
   const brand = BRAND(locale);
 
+  const deliverySub =
+    region === "SA"
+      ? localized("Inside Saudi Arabia", "داخل السعودية", locale)
+      : localized("Inside the UAE", "داخل الإمارات", locale);
+
   const features = [
     {
       icon: <BagIcon size={22} />,
-      title: localized("Ready-to-Gift", "جاهزة للإهداء", locale),
+      title: localized("Ready-made Gifts", "هدايا جاهزة", locale),
       sub: localized("For every occasion", "لكل مناسبة", locale),
     },
     {
       icon: <SparkleIcon size={22} />,
       title: localized("Elegant Packaging", "تغليف أنيق", locale),
-      sub: localized("With personal touches", "بلمسات شخصية", locale),
+      sub: localized("And personal touches", "ولمسات شخصية", locale),
     },
     {
       icon: <TruckIcon size={22} />,
       title: localized("Fast Delivery", "توصيل سريع", locale),
-      sub: localized("Across {country}", "في جميع أنحاء {country}", locale, { country: regionCopy.country }),
+      sub: deliverySub,
     },
   ];
 
@@ -122,15 +127,16 @@ export default async function AboutPage() {
               {localized("Our Story", "قصتنا", locale)}
             </p>
             <h1 className="mt-3 font-display text-4xl font-medium leading-[1.05] tracking-tight text-ink-900 sm:text-5xl md:text-6xl">
-              {localized("Because every beautiful gift", "لأن كل هدية جميلة", locale)}{" "}
-              <span className="italic text-bloom-700">
-                {localized("starts before it's opened.", "تبدأ قبل أن تُفتح.", locale)}
+              {localized("Because the gift ", "لأن الهدية ", locale)}
+              <span className="bg-linear-to-r from-bloom-600 to-gold-500 bg-clip-text text-transparent">
+                {localized("beautiful", "الجميلة", locale)}
               </span>
+              {localized(" starts before it's opened.", " تبدأ قبل فتحها.", locale)}
             </h1>
             <p className="mt-5 max-w-md text-lg text-ink-600">
               {localized(
-                "Thoughtfully curated gift boxes, flower bouquets, and newborn gifts — designed to create memorable moments and lasting impressions.",
-                "علب هدايا وباقات زهور وهدايا مواليد منتقاة بعناية — مصممة لصنع لحظات لا تُنسى وانطباعات تدوم.",
+                "We carefully coordinate gifts to leave a lasting impression — from occasion boxes and flower bouquets to newborn gifts designed with the finest details.",
+                "ننسق الهدايا بعناية لتترك انطباعاً يدوم، من بوكسات المناسبات وباقات الورد إلى هدايا المواليد المصممة بأدق التفاصيل.",
                 locale
               )}
             </p>
@@ -142,7 +148,7 @@ export default async function AboutPage() {
               </LocalizedLink>
               <LocalizedLink href={ROUTES.contact} className="contents">
                 <Button size="lg" variant="outline">
-                  {localized("Contact Services", "تواصل معنا", locale)}
+                  {localized("Contact customer service", "تواصل مع خدمة العملاء", locale)}
                 </Button>
               </LocalizedLink>
             </div>
@@ -334,7 +340,7 @@ export default async function AboutPage() {
           </LocalizedLink>
           <LocalizedLink href={ROUTES.contact} className="contents">
             <Button size="lg" variant="outline">
-              {localized("Contact Services", "تواصل معنا", locale)}
+              {localized("Contact customer service", "تواصل مع خدمة العملاء", locale)}
             </Button>
           </LocalizedLink>
         </div>

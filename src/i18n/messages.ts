@@ -157,9 +157,13 @@ export const messages = {
       newArrivalsDesc:
         "Just added to the boutique — the latest hand-arranged bouquets, boxes and keepsakes.",
       storyEyebrow: "Online gift shop",
-      storyTitle: "Ready-to-gift collections for every special occasion.",
-      storyBody:
-        "Amoon Boutique curates luxury flowers, gift boxes and newborn keepsakes — thoughtfully composed and beautifully wrapped, so every gift feels personal. From celebrations to quiet thank-yous, we make gifting effortless across {country}.",
+      storyTitle: "Ready-made gifts for every occasion… designed to leave a lasting impression.",
+      storyBodyCol1:
+        "At Amoon Boutique, we believe choosing a gift should be easy and special at the same time. That is why we have curated a diverse range of luxury gift boxes, elegant flower bouquets, and newborn gifts to suit different occasions and people.",
+      storyBodyCol2:
+        "We are committed to a complete gifting experience — from selecting and professionally arranging products to refined packaging and personalized gift cards — so you can express your feelings in the most beautiful way.",
+      storyBodyFooter:
+        "Whether you are looking for a birthday, graduation, newborn, thank-you, or surprise gift for someone dear, you will find carefully prepared options that combine elegance, quality, and the details that make the difference.",
       storyCta: "Explore the boutique",
       supportEyebrow: "Here to help",
       supportTitle: "We've got you.",
@@ -416,7 +420,7 @@ export const messages = {
       city: "City",
       country: "Country",
       area: "Area",
-      areaPlaceholder: "e.g. Al Barsha",
+      areaPlaceholder: "e.g. Al Olaya",
       areaHint: "Your neighborhood or community.",
       emirate: "Emirate",
       selectEmirate: "Select an emirate",
@@ -779,6 +783,7 @@ export const messages = {
       passwordsMatch: "Passwords do not match",
       nameRequired: "Name is required",
       passwordMin8: "Password must be at least 8 characters",
+      phoneDigits: "Enter exactly {count} digits",
     },
     location: {
       title: "Where are we delivering?",
@@ -2175,10 +2180,14 @@ export const messages = {
       newArrivalsTitle: "أحدث المنتجات.",
       newArrivalsDesc:
         "أضيفت للتو إلى البوتيك — أحدث الباقات والعلب والهدايا المنسقة يدويا.",
-      storyEyebrow: "متجر الهدايا الإلكتروني",
-      storyTitle: "مجموعات جاهزة للإهداء لكل مناسبة خاصة.",
-      storyBody:
-        "ينسق أمون بوتيك الزهور الفاخرة وعلب الهدايا وهدايا المواليد — بعناية وتغليف أنيق ليكون كل هدية شخصية. من الاحتفالات إلى كلمات الشكر، نجعل الإهداء سهلا في كل أنحاء {country}.",
+      storyEyebrow: "متجر هدايا إلكتروني",
+      storyTitle: "هدايا جاهزة لكل مناسبة... مصممة لتترك أثراً لا يُنسى.",
+      storyBodyCol1:
+        "في أمون بوتيك نؤمن أن اختيار الهدية يجب أن يكون سهلاً ومميزاً في الوقت نفسه، لذلك قمنا بتجهيز مجموعة متنوعة من بوكسات الهدايا الفاخرة، باقات الورد الأنيقة، وهدايا المواليد التي تناسب مختلف المناسبات والأشخاص.",
+      storyBodyCol2:
+        "نحرص على تقديم تجربة هدايا متكاملة تبدأ من اختيار المنتجات وتنسيقها باحترافية، وصولاً إلى التغليف الراقي وبطاقات الإهداء المخصصة، لنساعدك على التعبير عن مشاعرك بأجمل طريقة ممكنة.",
+      storyBodyFooter:
+        "سواء كنت تبحث عن هدية عيد ميلاد، تخرج، مولود جديد، شكر، أو مفاجأة لشخص عزيز، ستجد خيارات جاهزة بعناية تجمع بين الأناقة والجودة والتفاصيل التي تصنع الفرق.",
       storyCta: "اكتشف البوتيك",
       supportEyebrow: "نحن هنا لمساعدتك",
       supportTitle: "نحن معك.",
@@ -2245,8 +2254,8 @@ export const messages = {
       giftCardMessagePlaceholder: "اكتب رسالة الهدية (اختياري)…",
       giftCardBlankOption: "إرسال بطاقة فارغة (بدون رسالة)",
       giftNameModalTitle: "أضف اسم الهدية",
-      giftNameModalSubtitle: "أضف اسما إلى بطاقة الهدية (اختياري).",
-      giftNamePlaceholder: "أدخل اسم الهدية (اختياري)…",
+      giftNameModalSubtitle: "أضف اسم إلى بطاقة الهدية (اختياري).",
+      giftNamePlaceholder: "أضف اسم إلى بطاقة الهدية (اختياري).",
       customNameOption: "إضافة اسم مخصص (+ {price})؟",
       customNamePlaceholder: "أدخل الاسم المراد إضافته",
       customNameRequired: "الرجاء إدخال اسم",
@@ -2430,12 +2439,12 @@ export const messages = {
       city: "المدينة",
       country: "الدولة",
       area: "المنطقة",
-      areaPlaceholder: "مثال: البرشاء",
+      areaPlaceholder: "مثال: العليا",
       areaHint: "الحي أو المجتمع السكني.",
       emirate: "الإمارة",
       selectEmirate: "اختر إمارة",
-      province: "المنطقة الإدارية",
-      selectProvince: "اختر منطقة إدارية",
+      province: "المدينة",
+      selectProvince: "اختر المدينة",
       addressOtherRegion: "يتم التوصيل في {region} فقط",
       addressOtherRegionNoName: "محفوظ في منطقة أخرى",
       emirateUnavailable: "غير مطلوب لمنطقة التوصيل الخاصة بك.",
@@ -2793,6 +2802,7 @@ export const messages = {
       passwordsMatch: "كلمتا المرور غير متطابقتين",
       nameRequired: "الاسم مطلوب",
       passwordMin8: "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل",
+      phoneDigits: "أدخل {count} أرقام بالضبط",
     },
     location: {
       title: "إلى أين نوصل؟",

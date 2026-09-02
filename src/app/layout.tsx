@@ -68,6 +68,7 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
   variable: "--font-arabic-heading",
   subsets: ["arabic"],
   display: "swap",
+  preload: true,
   weight: ["500", "600", "700"],
 });
 
@@ -75,6 +76,7 @@ const notoArabic = Noto_Sans_Arabic({
   variable: "--font-arabic-body",
   subsets: ["arabic"],
   display: "swap",
+  preload: true,
   weight: ["400", "500", "600"],
 });
 

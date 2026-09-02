@@ -127,21 +127,48 @@ body {
    text is routed to dedicated Arabic webfonts loaded in layout.tsx —
    Noto Sans Arabic for body, IBM Plex Sans Arabic for display — matching
    the client's live site. Scoped to `dir="rtl"` so the Latin experience
-   is untouched. The global negative `letter-spacing` and Latin OpenType
-   stylistic sets (`ss01/ss02/cv11`) are reset here: letter-spacing on a
-   cursive, connected script suppresses glyph joining, and the stylistic
-   sets are Latin-only features that don't apply to Arabic anyway.
+   is untouched.
+
+   Re-point Tailwind's `--font-sans` / `--font-display` theme vars under
+   RTL so every utility resolves to Arabic stacks. Positive `tracking-*`
+   and `uppercase` utilities disconnect Arabic cursive joining on mobile
+   WebKit — neutralise them site-wide in RTL.
    ===================================================================== */
+html[dir="rtl"] {
+  --font-sans: var(--font-arabic-body), "Segoe UI", Tahoma, Arial, sans-serif;
+  --font-display: var(--font-arabic-heading), "Segoe UI", Tahoma, Arial, sans-serif;
+  letter-spacing: normal;
+  font-feature-settings: normal;
+  /* optimizeLegibility can suppress Arabic joining on some mobile WebKit builds. */
+  text-rendering: auto;
+}
+
 html[dir="rtl"] body {
   font-family: var(--font-arabic-body), "Segoe UI", Tahoma, Arial, sans-serif;
   letter-spacing: normal;
   font-feature-settings: normal;
 }
 
+html[dir="rtl"] .font-sans {
+  font-family: var(--font-arabic-body), "Segoe UI", Tahoma, Arial, sans-serif;
+  font-feature-settings: normal;
+  letter-spacing: normal;
+}
+
 html[dir="rtl"] .font-display {
   font-family: var(--font-arabic-heading), "Segoe UI", Tahoma, Arial, sans-serif;
   letter-spacing: normal;
   font-weight: 600;
+}
+
+/* Tailwind tracking-* / uppercase are Latin eyebrow patterns — they break
+   connected Arabic script, especially on iOS Safari. */
+html[dir="rtl"] :where([class*="tracking-"]) {
+  letter-spacing: normal !important;
+}
+
+html[dir="rtl"] :where(.uppercase) {
+  text-transform: none;
 }
 
 /* Tabular figures inside data tables/prices */
