@@ -129,10 +129,10 @@ export const messages = {
       goToSlide: "Go to slide {n}",
     },
     home: {
-      categoriesEyebrow: "Browse the boutique",
-      categoriesTitle: "For every quiet celebration.",
+      categoriesEyebrow: "Shop Now",
+      categoriesTitle: "For Every Special Occasion",
       categoriesDesc:
-        "From a single peony to a corporate installation, every category is composed by our team in {country}.",
+        "Thoughtfully curated gifts, made with love to make choosing easier and every occasion more memorable.",
       browseAll: "Browse all",
       featuredEyebrow: "Florist's edit",
       featuredTitle: "The week's quiet favourites.",
@@ -311,11 +311,10 @@ export const messages = {
       reviewViewMedia: "View photo {n}",
     },
     shop: {
-      title: "Shop the boutique",
-      heading: "Hand-arranged for every quiet celebration.",
-      heroSubtitle:
-        "Composed in our studio in {country}. Same-day delivery on orders placed before {cutoff}.",
-      heroSubtitleNoCutoff: "Composed in our studio in {country}.",
+      title: "Shop Now",
+      heading: "Thoughtfully curated gifts for all your happy moments.",
+      heroSubtitle: "A variety of gift boxes and beautiful flower bouquets.",
+      heroSubtitleNoCutoff: "A variety of gift boxes and beautiful flower bouquets.",
       filterSort: "Filter & sort",
       results: "results",
       result: "result",
@@ -2133,7 +2132,7 @@ export const messages = {
       sameDay: "توصيل في نفس اليوم في جميع أنحاء {country}",
       sameDayCutoff: "توصيل في نفس اليوم في جميع أنحاء {country} · اطلب قبل {cutoff}",
       freeDelivery: "توصيل مجاني للطلبات فوق {amount}",
-      handPacked: "يغلف يدويا في بوتيكنا في {country}",
+      handPacked: "يغلف ومرتبه في بوتيكنا في {country}",
       branches: "فروع أمون بوتيك في جميع أنحاء {country}",
       deliveryOnly: "التوصيل إلى جميع أنحاء {country} — تسوق أونلاين",
     },
@@ -2143,7 +2142,7 @@ export const messages = {
       slide1Title: "هدايا تحكي مشاعرك",
       slide1Subtitle:
         "لأن أجمل المشاعر تستحق هدية تليق بها.",
-      slide1Cta: "اكتشف هدايانا",
+      slide1Cta: "تسوّق الآن",
       slide2Title: "أكثر من هدية… ذكرى",
       slide2Subtitle:
         "تفاصيل مختارة بعناية لتصنع لحظة لا تُنسى.",
@@ -2154,10 +2153,10 @@ export const messages = {
       goToSlide: "الانتقال إلى الشريحة {n}",
     },
     home: {
-      categoriesEyebrow: "تصفح البوتيك",
+      categoriesEyebrow: "تسوق الأن",
       categoriesTitle: "لكل مناسبة جميلة.",
       categoriesDesc:
-        "من زهرة واحدة إلى تنسيق للشركات، تنسق كل فئة على يد فريقنا في {country}.",
+        "هدايا منسّقة بحب، لتجعل اختياركم أسهل ومناسباتكم أجمل",
       browseAll: "تصفح الكل",
       featuredEyebrow: "اختيار المنسق",
       featuredTitle: "المفضلة لهذا الأسبوع.",
@@ -2170,7 +2169,7 @@ export const messages = {
       promoEyebrow: "توصيل في كل أنحاء الإمارات",
       promoTitle: "دائما نبذل جهدا إضافيا.",
       promoSubtitle:
-        "تغلف يدويا في بوتيكنا بدبي وتوصل إلى بابك — في نفس اليوم للطلبات قبل الساعة 6 مساء.",
+        "تغلف ومرتبه في بوتيكنا بدبي وتوصل إلى بابك — في نفس اليوم للطلبات قبل الساعة 6 مساء.",
       promoCta: "ابدأ الآن",
       bestSellersEyebrow: "المفضلة لدى عملائنا",
       bestSellersTitle: "المنتجات الأكثر مبيعا.",
@@ -2179,7 +2178,7 @@ export const messages = {
       newArrivalsEyebrow: "وصل حديثا",
       newArrivalsTitle: "أحدث المنتجات.",
       newArrivalsDesc:
-        "أضيفت للتو إلى البوتيك — أحدث الباقات والعلب والهدايا المنسقة يدويا.",
+        "أضيفت للتو إلى البوتيك — أحدث الباقات والعلب والهدايا المنسقة ومرتبه.",
       storyEyebrow: "متجر هدايا إلكتروني",
       storyTitle: "هدايا جاهزة لكل مناسبة... مصممة لتترك أثراً لا يُنسى.",
       storyBodyCol1:
@@ -2332,11 +2331,10 @@ export const messages = {
       reviewViewMedia: "عرض الصورة {n}",
     },
     shop: {
-      title: "تسوق البوتيك",
-      heading: "منسقة يدويا لكل مناسبة جميلة.",
-      heroSubtitle:
-        "تنسق في استوديونا في {country}. توصيل في نفس اليوم للطلبات قبل {cutoff}.",
-      heroSubtitleNoCutoff: "تنسق في استوديونا في {country}.",
+      title: "تسوق الأن",
+      heading: "هدايا منسقة ومرتبه لكل لحظاتكم السعيدة.",
+      heroSubtitle: "صناديق هدايا متنوعة وباقات ورود مميزة.",
+      heroSubtitleNoCutoff: "صناديق هدايا متنوعة وباقات ورود مميزة.",
       filterSort: "تصفية وترتيب",
       results: "نتيجة",
       result: "نتيجة",
@@ -2377,7 +2375,7 @@ export const messages = {
       title: "سلتك",
       empty: "سلتك فارغة",
       emptyBody:
-        "ابدأ بباقة منسقة يدويا، أو كعكة احتفال، أو إحدى شموعنا المصبوبة يدويا.",
+        "ابدأ بباقة منسقة ومرتبه، أو كعكة احتفال، أو إحدى شموعنا المصبوبة ومرتبه.",
       orderSummary: "ملخص الطلب",
       checkout: "متابعة إلى الدفع",
       freeDelivery: "توصيل مجاني",
