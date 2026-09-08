@@ -1,12 +1,16 @@
-import { env } from "./env";
-
 /**
  * Brand metadata for Amoon Boutique. The display name reflects what
  * customers see in the live site header and is used by `<Header>`/`<Footer>`
  * for the wordmark.
+ *
+ * `name` is a CONSTANT, deliberately not `NEXT_PUBLIC_APP_NAME`. The company has
+ * one name in every environment, so an env var bought nothing — and a stale
+ * "Amoonis Boutique" left in a deployment's variables silently overrode the
+ * rename everywhere the brand appears (header, page titles, the order receipt
+ * and its PDF), with no sign of it in the code. Rename here, not in a dashboard.
  */
 export const siteConfig = {
-  name: env.NEXT_PUBLIC_APP_NAME ?? "Amoon Boutique",
+  name: "Amoon Boutique",
   shortName: "Amoon",
   tagline: "Composed gift boxes for the moments that matter",
   description:

@@ -9,7 +9,6 @@ const clientEnvSchema = z.object({
     .string()
     .url()
     .default("http://localhost:5000/api/v1"),
-  NEXT_PUBLIC_APP_NAME: z.string().default("Amoon Boutique"),
   NEXT_PUBLIC_APP_ENV: z
     .enum(["development", "staging", "production"])
     .default("development"),
@@ -22,7 +21,6 @@ const clientEnvSchema = z.object({
 
 const parsed = clientEnvSchema.safeParse({
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-  NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
   NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
   NEXT_PUBLIC_APPLE_CLIENT_ID: process.env.NEXT_PUBLIC_APPLE_CLIENT_ID,
