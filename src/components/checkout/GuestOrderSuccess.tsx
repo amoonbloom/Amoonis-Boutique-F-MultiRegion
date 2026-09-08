@@ -10,6 +10,7 @@ import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants/storage-keys";
 import { useT } from "@/i18n/useT";
 import { trackPurchase } from "@/lib/gtm";
+import { trackPixelPurchase } from "@/lib/metaPixel";
 import { ordersApi } from "@/features/orders/api/orders.api";
 import { queryKeys } from "@/services/queryKeys";
 import type { MessageKey } from "@/i18n";
@@ -91,6 +92,7 @@ export function GuestOrderSuccess({ orderId }: { orderId?: string }) {
     if (order && !tracked.current) {
       tracked.current = true;
       trackPurchase(order);
+      trackPixelPurchase(order);
     }
   }, [order]);
 

@@ -11,6 +11,7 @@ import { queryKeys } from "@/services/queryKeys";
 import { ROUTES } from "@/constants/routes";
 import { useT } from "@/i18n/useT";
 import { trackPurchase } from "@/lib/gtm";
+import { trackPixelPurchase } from "@/lib/metaPixel";
 import type { MessageKey } from "@/i18n";
 import { ReceiptStage, ConfirmationHero, ReceiptCard, ReceiptActions } from "./receiptParts";
 
@@ -43,7 +44,9 @@ export function OrderReceipt({ orderId }: { orderId?: string }) {
   });
 
   useEffect(() => {
-    if (query.data) trackPurchase(query.data);
+    if (!query.data) return;
+    trackPurchase(query.data);
+    trackPixelPurchase(query.data);
   }, [query.data]);
 
   return (

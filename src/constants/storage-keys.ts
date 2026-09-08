@@ -11,4 +11,6 @@ export const STORAGE_KEYS = {
   // that order, so a refresh/remount of the confirmation page never double-fires
   // it — see src/lib/gtm.ts.
   gtmPurchaseTrackedPrefix: "amoonis.gtmPurchaseTracked.",
+  // Same idea for the Meta Pixel "Purchase" event — see src/lib/metaPixel.ts.
+  metaPixelPurchaseTrackedPrefix: "amoonis.metaPixelPurchaseTracked.",
 } as const;

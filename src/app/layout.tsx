@@ -10,6 +10,7 @@ import {
   GoogleTagManagerScript,
   GoogleTagManagerNoScript,
 } from "@/components/layout/GoogleTagManager";
+import { MetaPixel } from "@/components/layout/MetaPixel";
 import { StoreProvider } from "@/store/providers/StoreProvider";
 import { QueryProvider } from "@/store/providers/QueryProvider";
 import { MotionProvider } from "@/components/motion/MotionProvider";
@@ -147,6 +148,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-cream-50 text-ink-900 font-sans">
         <GoogleTagManagerNoScript />
         <GoogleTagManagerScript />
+        <MetaPixel />
         <StoreProvider
           initialLocale={locale}
           initialCountry={initialCountry}
