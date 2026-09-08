@@ -38,6 +38,9 @@ export function CurrencyAmount({
         // a fallback height for the rare browser without `cap`-unit support.
         <Icon
           size="0.82em"
+          // Stamped so the PDF capture can swap the glyph for its ISO code — see
+          // useTextCurrencySigns() in features/orders/receiptPdf.ts.
+          data-currency-sign={currency}
           style={{
             height: "1cap",
             width: "auto",

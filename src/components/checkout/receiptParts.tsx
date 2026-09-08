@@ -285,14 +285,27 @@ export function ReceiptCard({ order }: { order: ApiOrder }) {
       >
       {/* Branded header: company identity + document title/meta */}
       <header className="flex flex-col gap-6 border-b border-ink-100 px-6 py-6 sm:flex-row sm:items-start sm:justify-between sm:px-9 sm:py-7">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          {/* Intrinsic size spelled out (the file's own viewBox): `w-auto` alone
+              leaves the SVG without one, and the PDF exporter — which rasterises
+              images from their width/height — then draws the wordmark stretched
+              and clipped. The rendered size is still `h-8` with the width
+              derived from this ratio. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt={siteConfig.name} className="h-8 w-auto self-start" />
-          <div>
+          <img
+            src="/logo.svg"
+            alt={siteConfig.name}
+            width={758}
+            height={146}
+            className="h-8 w-auto self-start"
+          />
+          {/* Name, entity and contact read as one identity block — a single
+              tight stack rather than three separately spaced lines. */}
+          <div className="space-y-0.5 leading-snug">
             <p className="font-display text-base font-medium text-ink-900">{siteConfig.name}</p>
             <p className="text-xs text-ink-400">{contact.legalEntity}</p>
+            <p className="text-xs text-ink-500">{contact.email}</p>
           </div>
-          <p className="text-xs text-ink-500">{contact.email}</p>
         </div>
 
         <div className="sm:text-end">
@@ -331,12 +344,14 @@ export function ReceiptCard({ order }: { order: ApiOrder }) {
               </p>
             )}
             {email && (
-              <p className="flex items-center gap-1.5">
-                <MailIcon size={12} className="shrink-0 text-ink-400" />
+              // Wraps rather than truncates: a receipt is a record, and half an
+              // address ("guest@example.co…") is no use on paper or in the PDF.
+              <p className="flex items-start gap-1.5">
+                <MailIcon size={12} className="mt-1 shrink-0 text-ink-400" />
                 <a
                   href={`mailto:${email}`}
                   dir="ltr"
-                  className="min-w-0 truncate [unicode-bidi:isolate] transition-colors hover:text-bloom-700"
+                  className="min-w-0 wrap-break-word [unicode-bidi:isolate] transition-colors hover:text-bloom-700"
                 >
                   {email}
                 </a>
@@ -440,15 +455,20 @@ export function ReceiptCard({ order }: { order: ApiOrder }) {
               : t("order.itemFallback");
 
             return (
-            <li key={item.id} className={`${ITEM_COLS} py-3.5`}>
-              <div className="flex min-w-0 flex-col gap-2">
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-blush-50 ring-1 ring-ink-100">
+            // `break-inside-avoid` keeps a row whole when the browser prints
+            // the receipt; the PDF exporter breaks pages the same way.
+            <li key={item.id} className={`${ITEM_COLS} break-inside-avoid py-3.5`}>
+              {/* Thumbnail beside the title, not above it: the row stays short
+                  enough that its qty/unit/amount columns line up with the item
+                  name instead of floating a thumbnail's height above it. */}
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-blush-50 ring-1 ring-ink-100">
                   {item.selectedImage ?? item.product?.image ? (
                     <Image
                       src={(item.selectedImage ?? item.product?.image) as string}
                       alt={productTitle}
                       fill
-                      sizes="64px"
+                      sizes="56px"
                       className="object-cover"
                     />
                   ) : null}
@@ -496,9 +516,10 @@ export function ReceiptCard({ order }: { order: ApiOrder }) {
         </ul>
       </div>
 
-      {/* Totals — right-aligned summary column */}
+      {/* Totals — right-aligned summary column. `break-inside-avoid` keeps the
+          block off a page seam when printed, so the total never lands alone. */}
       <div className="px-6 pb-7 pt-5 sm:px-9">
-        <div className="ms-auto flex flex-col gap-2 text-sm sm:w-80">
+        <div className="ms-auto flex break-inside-avoid flex-col gap-2 text-sm sm:w-88">
           <TotalRow label={t("common.subtotal")} value={price(subtotal)} />
           {discount > 0 && (
             <TotalRow
@@ -864,21 +885,33 @@ function TotalRow({
 
 type BadgeTone = "success" | "pending" | "danger" | "neutral";
 
+/**
+ * Status pill. Deliberately built from INLINE layout and a real border rather
+ * than `inline-flex` + `ring-inset`: this badge has to survive the receipt's
+ * PDF export, and html2canvas implements neither flexbox nor inset ring
+ * shadows — it dropped the label out of the capsule and drew the ring as a pale
+ * rectangle across it. Inline-block + `align-middle` looks identical on screen
+ * and rasterises correctly.
+ */
 function StatusBadge({ tone, label }: { tone: BadgeTone; label: string }) {
   const tones: Record<BadgeTone, string> = {
-    success: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    pending: "bg-amber-50 text-amber-700 ring-amber-200",
-    danger: "bg-rose-50 text-rose-700 ring-rose-200",
-    neutral: "bg-cream-100 text-bloom-700 ring-bloom-200",
+    success: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    pending: "bg-amber-50 text-amber-700 border-amber-200",
+    danger: "bg-rose-50 text-rose-700 border-rose-200",
+    neutral: "bg-cream-100 text-bloom-700 border-bloom-200",
   };
   return (
     <span
       className={
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider ring-1 ring-inset " +
+        // `leading-none` matters as much as the layout: with the inherited
+        // 20px line-height on an 11px label, html2canvas puts the baseline
+        // below the capsule (it ignores half-leading). Padding restores the
+        // pill's height.
+        "inline-block rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase leading-none tracking-wider " +
         tones[tone]
       }
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+      <span className="me-1.5 inline-block h-1.5 w-1.5 rounded-full bg-current align-middle opacity-70" />
       {label}
     </span>
   );
