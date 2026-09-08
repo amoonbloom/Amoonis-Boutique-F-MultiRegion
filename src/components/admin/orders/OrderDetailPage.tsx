@@ -67,6 +67,9 @@ export function OrderDetailPage({ id }: { id: string }) {
     order.subtotalAmount ?? order.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const vatAmount = order.vatAmount ?? order.taxAmount ?? 0;
   const showVat = order.vatRatePercent != null && vatAmount > 0;
+  // Flat delivery fee snapshot (already inside totalAmount). Shown as its own line so
+  // the admin can see subtotal + shipping reconcile to the total. 0 = free delivery.
+  const shipping = order.shippingAmount ?? 0;
   // Always format admin amounts in the order's OWN stamped currency (SAR for a
   // Saudi order, AED for a UAE order) — never a hardcoded/default currency — so
   // staff see the currency the customer was actually charged in.
@@ -178,6 +181,17 @@ export function OrderDetailPage({ id }: { id: string }) {
                   <dd>−{money(order.discountAmount)}</dd>
                 </div>
               ) : null}
+              <div className="flex justify-between text-ink-500">
+                <dt>
+                  {t("checkout.shipment")}
+                  {shipping > 0 && order.vatRatePercent != null ? (
+                    <span className="ms-1 text-xs text-ink-400">
+                      ({t("checkout.flatRateVatInclusive")})
+                    </span>
+                  ) : null}
+                </dt>
+                <dd>{shipping > 0 ? money(shipping) : t("common.free")}</dd>
+              </div>
               {showVat ? (
                 <div className="flex justify-between text-ink-500">
                   <dt>
