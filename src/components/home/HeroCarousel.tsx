@@ -120,7 +120,10 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   useEffect(() => {
     if (!hasMultiple || reduced) return;
     if (slides[active]?.kind === "video") return;
-    const id = setTimeout(next, 6000);
+    // TEMP (revert later): the first slide (promo banner) stays ~9s; all others 6s.
+    // Revert = uncomment the original line below and delete the two TEMP lines.
+    // const id = setTimeout(next, 6000);
+    const id = setTimeout(next, active === 0 ? 9000 : 6000);
     return () => clearTimeout(id);
   }, [active, hasMultiple, reduced, slides, next]);
 
@@ -231,6 +234,10 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
 
       {/* Content overlay */}
       <div className="relative z-10 flex h-full w-full flex-col justify-end p-5 sm:p-8 lg:p-12">
+        {/* TEMP (revert later): hide the hero copy (eyebrow + title + subtitle + CTA) on the
+            FIRST slide only — the promo banner already carries its own baked-in text. Revert =
+            delete this `{active !== 0 && (` line and its matching `)}` just above the pager. */}
+        {active !== 0 && (
         <div className="hidden max-w-xl sm:mb-10 sm:block">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/85 sm:text-xs">
             {sameDayEnabled
@@ -253,6 +260,8 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
             </LocalizedLink>
           </div>
         </div>
+        )}
+        {/* END TEMP guard */}
 
         {hasMultiple && (
           <div className="flex items-center justify-end gap-4">
@@ -294,6 +303,9 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     {/* Mobile shop button — sits at the bottom-left of the carousel, half
         inside the image and half below it. Must live outside the overflow-hidden
         <section> so it isn't clipped at the rounded edge. */}
+    {/* TEMP (revert later): hide the mobile shop button on the FIRST slide too, for
+        consistency with the hidden desktop copy. Revert = delete this guard + its `)}`. */}
+    {active !== 0 && (
     <LocalizedLink
       href={ROUTES.shop}
       className="absolute bottom-0 inset-s-5 z-20 translate-y-1/2 inline-flex items-center gap-2.5 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-bloom-700 shadow-xl ring-4 ring-cream-50 transition-colors hover:bg-cream-50 active:scale-95 sm:hidden"
@@ -301,6 +313,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       {t(copy.cta)}
       <ArrowRight size={14} className="rtl:-scale-x-100" />
     </LocalizedLink>
+    )}
     </div>
   );
 }
