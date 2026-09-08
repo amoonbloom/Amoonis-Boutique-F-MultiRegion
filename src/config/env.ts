@@ -9,7 +9,7 @@ const clientEnvSchema = z.object({
     .string()
     .url()
     .default("http://localhost:5000/api/v1"),
-  NEXT_PUBLIC_APP_NAME: z.string().default("Amoon Bloom"),
+  NEXT_PUBLIC_APP_NAME: z.string().default("Amoon Boutique"),
   NEXT_PUBLIC_APP_ENV: z
     .enum(["development", "staging", "production"])
     .default("development"),

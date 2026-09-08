@@ -1,16 +1,16 @@
 import { env } from "./env";
 
 /**
- * Brand metadata for Amoonis Boutique. The display name reflects what
+ * Brand metadata for Amoon Boutique. The display name reflects what
  * customers see in the live site header and is used by `<Header>`/`<Footer>`
  * for the wordmark.
  */
 export const siteConfig = {
-  name: env.NEXT_PUBLIC_APP_NAME ?? "Amoonis Boutique",
+  name: env.NEXT_PUBLIC_APP_NAME ?? "Amoon Boutique",
   shortName: "Amoon",
   tagline: "Composed gift boxes for the moments that matter",
   description:
-    "Amoonis Boutique — curated gift boxes, hand-tied flowers, and same-day delivery in the UAE. Composed by hand for graduations, Eid, newborns, and every quiet celebration in between.",
+    "Amoon Boutique — curated gift boxes, hand-tied flowers, and same-day delivery in the UAE. Composed by hand for graduations, Eid, newborns, and every quiet celebration in between.",
   url: "https://amoon-bloom-f.vercel.app",
   ogImage: "/images/og-image.png",
   // Single store currency. The backend stores one price per product in one
