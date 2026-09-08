@@ -20,9 +20,12 @@ import {
   LOCALES,
   activeRegionSlugs,
   buildPrefix,
+  parsePrefix,
   regionSlug,
   withLocale,
+  withPrefix,
   PATHNAME_HEADER,
+  SEARCH_HEADER,
   LOCALE_CHOSEN_COOKIE,
 } from "@/features/location/routing";
 
@@ -40,20 +43,37 @@ export default async function StorefrontLayout({
 }: Readonly<{ children: ReactNode; params: Promise<{ region: string; locale: string }> }>) {
   const { region, locale: localeParam } = await params;
   if (!(LOCALES as string[]).includes(localeParam)) notFound();
+
+  // Where the visitor actually asked to go. Both redirects below rebuild the URL
+  // and must carry BOTH of these through, or the destination is lost — an
+  // emailed `/order/status?id=…` used to arrive at the homepage with no order.
+  const requestHeaders = await headers();
+  const requestPath =
+    requestHeaders.get(PATHNAME_HEADER) ?? buildPrefix(region, localeParam);
+  const requestSearch = requestHeaders.get(SEARCH_HEADER) ?? "";
+
   const regions = await getCachedRegions().catch(() => []);
   // `GET /regions` (public) already returns ONLY active regions, so any slug that
   // isn't in this list is either hidden-by-admin or unknown.
   if (!activeRegionSlugs(regions).includes(region.toLowerCase())) {
     // Don't 404 when other regions are OPEN — that strands every visitor whose
     // default/last-used region has been hidden (the edge proxy sends a bare "/"
-    // to the hardcoded default slug "ae"; if that's hidden, the old code 404'd
-    // even though another region was live). Bounce to the best available active
-    // region instead: the one flagged default, else the first by sortOrder. The
-    // target is guaranteed active (drawn from this same list), so it can't loop,
-    // and the proxy re-syncs the region_slug cookie on the redirect, so a later
-    // bare-path visit lands here directly. Only a store with ZERO open regions 404s.
+    // to NEXT_PUBLIC_DEFAULT_REGION_SLUG; if that region is hidden, the old code
+    // 404'd even though another region was live). Bounce to the best available
+    // active region instead: the one flagged default, else the first by
+    // sortOrder. The target is guaranteed active (drawn from this same list), so
+    // it can't loop, and the proxy re-syncs the region_slug cookie on the
+    // redirect, so a later bare-path visit lands here directly. Only a store
+    // with ZERO open regions 404s.
+    //
+    // The requested sub-path and query ride along: swapping the region is no
+    // reason to forget which page the visitor asked for.
     const fallback = regions.find((r) => r.isDefault) ?? regions[0];
-    if (fallback) redirect(buildPrefix(regionSlug(fallback), localeParam));
+    if (fallback) {
+      const rest = parsePrefix(requestPath)?.rest ?? "/";
+      const prefix = buildPrefix(regionSlug(fallback), localeParam);
+      redirect(withPrefix(prefix, rest) + requestSearch);
+    }
     notFound();
   }
 
@@ -71,11 +91,7 @@ export default async function StorefrontLayout({
     defaultLocale !== localeParam
   ) {
     const chose = (await cookies()).get(LOCALE_CHOSEN_COOKIE)?.value === "1";
-    if (!chose) {
-      const pathname =
-        (await headers()).get(PATHNAME_HEADER) ?? buildPrefix(region, localeParam);
-      redirect(withLocale(pathname, defaultLocale));
-    }
+    if (!chose) redirect(withLocale(requestPath, defaultLocale) + requestSearch);
   }
 
   const locale = await getServerLocale();

@@ -29,8 +29,21 @@ export function isLocaleSlug(v: unknown): v is Locale {
   return v === "en" || v === "ar";
 }
 
-/** Region slug used when a first-time visitor has no prior choice (UAE = home market). */
-export const DEFAULT_REGION_SLUG = "ae";
+/**
+ * Region slug used when a first-time visitor has no prior choice.
+ *
+ * The edge proxy runs before anything can ask the API which regions are open,
+ * so this first guess is static — but it must not be a region that has since
+ * been switched off, or every cookie-less visitor (everyone arriving from an
+ * email or a search result) takes a detour through a dead region. Set
+ * NEXT_PUBLIC_DEFAULT_REGION_SLUG per deployment to whichever market is live;
+ * the literal below is only the historical home market's fallback.
+ *
+ * Read straight off `process.env` rather than through `@/config/env` so this
+ * module — which the edge proxy imports — stays free of the zod bundle.
+ */
+export const DEFAULT_REGION_SLUG =
+  process.env.NEXT_PUBLIC_DEFAULT_REGION_SLUG?.trim().toLowerCase() || "ae";
 
 /**
  * Request headers the edge `proxy` injects from the validated URL prefix so the
@@ -45,6 +58,12 @@ export const LOCALE_HEADER = "x-locale";
  *  layout can build a same-path redirect (e.g. the flash-free default-language
  *  redirect) without re-deriving the sub-path from route params. */
 export const PATHNAME_HEADER = "x-pathname";
+/** The request's query string (`?id=…`, leading "?" included, "" when absent),
+ *  injected alongside PATHNAME_HEADER. Kept separate because the layout's
+ *  redirects rebuild the path from route params and would otherwise silently
+ *  drop the query — which is how emailed `/order/status?id=…` links used to
+ *  land the customer on the homepage with no order. */
+export const SEARCH_HEADER = "x-search";
 /** Cookie holding the region SLUG (distinct from the existing `region` cookie, which holds the CODE for X-Region). */
 export const REGION_SLUG_COOKIE = "region_slug";
 /** Set to "1" once the visitor explicitly picks a language (LocaleToggle). While
