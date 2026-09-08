@@ -138,7 +138,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <StaggerGroup className="flex flex-col gap-6" trigger="mount" stagger={0.08}>
             <StaggerItem>
               {product.onSale ? (
-                <span className="mb-3 inline-flex w-fit items-center gap-1 rounded-full bg-linear-to-br from-bloom-600 via-bloom-500 to-bloom-600 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white shadow-(--shadow-bloom) ring-1 ring-white/25">
+                <span className="mb-3 inline-flex w-fit items-center gap-1 rounded-full bg-linear-to-br from-[#0c7f40] via-[#006c35] to-[#055c2d] px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_-10px_rgba(0,108,53,0.55)] ring-1 ring-white/25">
                   {product.saleLabel || t(locale, "product.badgeSale")}
                 </span>
               ) : null}

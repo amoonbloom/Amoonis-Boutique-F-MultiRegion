@@ -139,7 +139,7 @@ export function ProductCard({ product, className, priority }: ProductCardProps) 
         <div className="absolute start-3 top-3 z-20 flex flex-col items-start gap-2">
           {/* Sale — the dominant marketing badge (product / category / section driven). */}
           {product.onSale && (
-            <span className="inline-flex w-fit items-center gap-1 rounded-full bg-linear-to-br from-bloom-600 via-bloom-500 to-bloom-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white shadow-(--shadow-bloom) ring-1 ring-white/25">
+            <span className="inline-flex w-fit items-center gap-1 rounded-full bg-linear-to-br from-[#0c7f40] via-[#006c35] to-[#055c2d] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_-10px_rgba(0,108,53,0.55)] ring-1 ring-white/25">
               {product.saleLabel || t("product.badgeSale")}
             </span>
           )}
