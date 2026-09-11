@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import type { Locale } from "@/store/slices/ui.slice";
 import type { ApiOrder } from "@/features/orders/types";
 import type { RegionContact } from "@/features/location/regionContact";
@@ -29,6 +30,34 @@ import {
  *  - No SKU line (the catalog has no SKU) — we show the variant instead.
  *  - One stored address, so Billing and Shipping show the same address.
  */
+const BIDI_ISOLATE: CSSProperties = { unicodeBidi: "isolate" };
+
+/**
+ * Bidi isolation for USER-ENTERED text (names, areas, product titles, notes),
+ * which can be Arabic inside the English invoice or Latin inside the Arabic one.
+ * `dir="auto"` gives the value its own base direction from its first strong
+ * character, and `unicode-bidi: isolate` stops it from re-ordering neighbouring
+ * text (punctuation, digits, the next address part). The browser lays this out;
+ * html2canvas mirrors the browser's positions, so the PDF inherits the fix.
+ */
+function Auto({ children }: { children: ReactNode }) {
+  return (
+    <span dir="auto" style={BIDI_ISOLATE}>
+      {children}
+    </span>
+  );
+}
+
+/** Always-LTR atoms: phone numbers, emails, amounts, references, filenames —
+ *  otherwise a leading "+" or currency code jumps to the wrong side under RTL. */
+function Ltr({ children }: { children: ReactNode }) {
+  return (
+    <span dir="ltr" style={BIDI_ISOLATE}>
+      {children}
+    </span>
+  );
+}
+
 export function OrderInvoiceDocument({
   order,
   locale,
@@ -96,12 +125,24 @@ export function OrderInvoiceDocument({
   const customerName = addr?.fullName || order.guestName || "—";
   const customerEmail = order.guestEmail || null;
   const customerPhone = addr?.phone || order.guestPhone || null;
-  const streetLine = [addr?.streetAddress, addr?.apartment].filter(Boolean).join(", ");
-  const cityLine = [addr?.area || addr?.deliveryZoneName, addr?.city, addr?.state]
-    .filter(Boolean)
-    .join(", ");
 
-  const metaRow = (label: string, value: string) => (
+  // Address as LINES of atomic PARTS (never pre-joined strings): each part is
+  // bidi-isolated below so a mixed line like "الجوهرة, Dammam" keeps the
+  // container's reading order instead of the Arabic run dragging its Latin
+  // neighbour around. Covers every stored shape: the current zone-based
+  // checkout (area + zone/province), legacy street addresses, and orders that
+  // carry both. The zone/province is shown ALONGSIDE the area — it was being
+  // dropped by an `area || zone` fallback before.
+  const addressLines: string[][] = [
+    [addr?.streetAddress, addr?.apartment],
+    [addr?.area, addr?.deliveryZoneName],
+    [addr?.city, addr?.state, addr?.postalCode],
+    [addr?.country],
+  ]
+    .map((parts) => parts.map((p) => p?.trim()).filter((p): p is string => !!p))
+    .filter((parts) => parts.length > 0);
+
+  const metaRow = (label: string, value: ReactNode) => (
     <div className="flex items-baseline justify-between gap-6">
       <span className="font-semibold text-ink-900">{label}</span>
       <span className="text-ink-800">{value}</span>
@@ -113,23 +154,26 @@ export function OrderInvoiceDocument({
       dir={dir}
       lang={locale}
       className="invoice-print-area mx-auto w-[794px] bg-white px-12 py-10 text-sm text-ink-800"
-      // Under RTL this node isn't a descendant of <html dir="rtl">, so the global
-      // Arabic resets never reach it — and the inherited Latin base styles
-      // (letter-spacing: -0.005em, Latin font-feature-settings, optimizeLegibility)
-      // make html2canvas render Arabic PER CHARACTER, breaking cursive joining.
-      // Replicate the html[dir="rtl"] reset here so the capture shapes Arabic.
-      style={
-        dir === "rtl"
-          ? {
-              fontFamily:
-                "var(--font-arabic-body), 'Segoe UI', Tahoma, Arial, sans-serif",
-              letterSpacing: "normal",
-              fontFeatureSettings: "normal",
-              fontVariantLigatures: "normal",
-              textRendering: "auto",
-            }
-          : undefined
-      }
+      // CAPTURE-SAFE TEXT, FOR BOTH LOCALES. html2canvas splits text into
+      // graphemes and draws them one by one whenever computed letter-spacing is
+      // non-zero (see html2canvas-pro: `letterSpacing !== 0 ? segmentGraphemes :
+      // segmentWords`) — which renders Arabic in disconnected isolated forms.
+      // This node isn't under <html dir="rtl">, so the global Arabic reset never
+      // reaches it, and the body's Latin base styles (letter-spacing -0.005em,
+      // Latin feature sets, optimizeLegibility) would leak in. Arabic can appear
+      // in the ENGLISH invoice too (customer names, areas, product titles,
+      // notes), so the reset must not depend on the invoice language. The font
+      // stack always carries the Arabic face as a fallback for the same reason.
+      style={{
+        fontFamily:
+          dir === "rtl"
+            ? "var(--font-arabic-body), var(--font-sans), 'Segoe UI', Tahoma, Arial, sans-serif"
+            : "var(--font-sans), var(--font-arabic-body), 'Segoe UI', Tahoma, Arial, sans-serif",
+        letterSpacing: "normal",
+        fontFeatureSettings: "normal",
+        fontVariantLigatures: "normal",
+        textRendering: "auto",
+      }}
     >
       {/* ── Header: logo (start) + meta (end) ───────────────────────────── */}
       <div className="flex items-start justify-between gap-8">
@@ -151,12 +195,14 @@ export function OrderInvoiceDocument({
           ) : null}
         </div>
         <div className="flex w-[320px] flex-col gap-1 text-end text-[13px]">
-          {metaRow(t(locale, "invoice.invoiceNumber"), String(orderRef))}
-          {metaRow(t(locale, "invoice.orderNumber"), String(orderRef))}
-          {metaRow(t(locale, "invoice.orderDate"), orderDate)}
+          {metaRow(t(locale, "invoice.invoiceNumber"), <Ltr>{String(orderRef)}</Ltr>)}
+          {metaRow(t(locale, "invoice.orderNumber"), <Ltr>{String(orderRef)}</Ltr>)}
+          {metaRow(t(locale, "invoice.orderDate"), <Auto>{orderDate}</Auto>)}
           {metaRow(t(locale, "invoice.paymentMethod"), paymentLabel)}
           {metaRow(t(locale, "invoice.status"), statusLabel)}
-          {deliveryDate ? metaRow(t(locale, "invoice.deliveryDate"), deliveryDate) : null}
+          {deliveryDate
+            ? metaRow(t(locale, "invoice.deliveryDate"), <Auto>{deliveryDate}</Auto>)
+            : null}
         </div>
       </div>
 
@@ -174,14 +220,31 @@ export function OrderInvoiceDocument({
             className="rounded-xl border border-ink-100 px-5 py-4"
           >
             <p className={`mb-2 ${eyebrow}`}>{box.heading}</p>
-            <p className="font-medium text-ink-900">{customerName}</p>
-            {streetLine ? <p className="text-ink-700">{streetLine}</p> : null}
-            {cityLine ? <p className="text-ink-700">{cityLine}</p> : null}
+            <p className="font-medium text-ink-900">
+              <Auto>{customerName}</Auto>
+            </p>
+            {/* Each address part is isolated on its own; the ", " separators
+                belong to the container so the line reads in the invoice's
+                direction ("الجوهرة, Dammam" in English, mirrored in Arabic). */}
+            {addressLines.map((parts, i) => (
+              <p key={i} className="text-ink-700">
+                {parts.map((part, j) => (
+                  <Fragment key={j}>
+                    {j > 0 ? ", " : null}
+                    <Auto>{part}</Auto>
+                  </Fragment>
+                ))}
+              </p>
+            ))}
             {box.withContact && customerPhone ? (
-              <p className="mt-2 text-ink-700">{customerPhone}</p>
+              <p className="mt-2 text-ink-700">
+                <Ltr>{customerPhone}</Ltr>
+              </p>
             ) : null}
             {box.withContact && customerEmail ? (
-              <p className="text-ink-700">{customerEmail}</p>
+              <p className="text-ink-700">
+                <Ltr>{customerEmail}</Ltr>
+              </p>
             ) : null}
           </div>
         ))}
@@ -208,21 +271,35 @@ export function OrderInvoiceDocument({
               item.product?.title_ar,
               locale
             );
-            const variant = item.selectedOptions
-              ? Object.values(item.selectedOptions).filter(Boolean).join(" · ")
-              : "";
+            // Variant values are user/admin text that may be Arabic in either
+            // invoice language — isolate each value, keep the " · " separators
+            // in the container direction.
+            const variantValues = item.selectedOptions
+              ? Object.values(item.selectedOptions).filter(Boolean)
+              : [];
             return (
               <tr key={item.id} className="border-b border-ink-100 align-top">
                 <td className="py-3 pe-4 text-start">
-                  <span className="text-ink-900">{title}</span>
-                  {variant ? (
-                    <span className="mt-0.5 block text-xs text-ink-400">{variant}</span>
+                  <span className="text-ink-900">
+                    <Auto>{title}</Auto>
+                  </span>
+                  {variantValues.length ? (
+                    <span className="mt-0.5 block text-xs text-ink-400">
+                      {variantValues.map((v, j) => (
+                        <Fragment key={j}>
+                          {j > 0 ? " · " : null}
+                          <Auto>{v}</Auto>
+                        </Fragment>
+                      ))}
+                    </span>
                   ) : null}
                 </td>
-                <td className="py-3 text-end text-ink-800">{money(item.price)}</td>
+                <td className="py-3 text-end text-ink-800">
+                  <Ltr>{money(item.price)}</Ltr>
+                </td>
                 <td className="py-3 text-center text-ink-800">{item.quantity}</td>
                 <td className="py-3 text-end text-ink-800">
-                  {money(item.price * item.quantity)}
+                  <Ltr>{money(item.price * item.quantity)}</Ltr>
                 </td>
               </tr>
             );
@@ -235,31 +312,37 @@ export function OrderInvoiceDocument({
         <div className="w-[320px]">
           <div className="flex items-baseline justify-between py-1 text-ink-700">
             <span>{t(locale, "invoice.itemsSubtotal")}</span>
-            <span>{money(subtotal)}</span>
+            <Ltr>{money(subtotal)}</Ltr>
           </div>
           {discount > 0 ? (
             <div className="flex items-baseline justify-between py-1 text-ink-700">
               <span>
                 {t(locale, "common.discount")}
-                {order.appliedPromoCode ? ` (${order.appliedPromoCode})` : ""}
+                {order.appliedPromoCode ? (
+                  <>
+                    {" ("}
+                    <Ltr>{order.appliedPromoCode}</Ltr>
+                    {")"}
+                  </>
+                ) : null}
               </span>
-              <span>−{money(discount)}</span>
+              <Ltr>−{money(discount)}</Ltr>
             </div>
           ) : null}
           <div className="flex items-baseline justify-between py-1 text-ink-700">
             <span>{t(locale, "invoice.shipping")}</span>
-            <span>{shipping > 0 ? money(shipping) : t(locale, "common.free")}</span>
+            {shipping > 0 ? <Ltr>{money(shipping)}</Ltr> : <span>{t(locale, "common.free")}</span>}
           </div>
           {showVatLine && !order.vatInclusive ? (
             <div className="flex items-baseline justify-between py-1 text-ink-700">
               <span>{t(locale, "order.vatLabel", { rate: order.vatRatePercent! })}</span>
-              <span>+{money(vatAmount)}</span>
+              <Ltr>+{money(vatAmount)}</Ltr>
             </div>
           ) : null}
           <div className="mt-1 h-[2px] w-full bg-[#006c35]" />
           <div className="flex items-baseline justify-between py-2 text-base font-bold text-ink-900">
             <span>{t(locale, "invoice.orderTotal")}</span>
-            <span>{amount(order.totalAmount)}</span>
+            <Ltr>{amount(order.totalAmount)}</Ltr>
           </div>
           {order.vatInclusive ? (
             <p className="text-end text-xs text-ink-400">{t(locale, "product.vatInclusive")}</p>
@@ -276,7 +359,11 @@ export function OrderInvoiceDocument({
       {order.orderMessage ? (
         <div className="mt-8 rounded-xl border border-ink-100 px-5 py-4">
           <p className={`mb-2 ${eyebrow}`}>{t(locale, "invoice.customerNote")}</p>
-          <p className="whitespace-pre-line text-ink-700">{order.orderMessage}</p>
+          {/* A free-text note takes its own base direction (an Arabic note in the
+              English invoice keeps its digits/punctuation in Arabic order). */}
+          <p dir="auto" className="whitespace-pre-line text-ink-700" style={BIDI_ISOLATE}>
+            {order.orderMessage}
+          </p>
         </div>
       ) : null}
 
@@ -284,11 +371,19 @@ export function OrderInvoiceDocument({
       <div className="mt-10 flex items-start justify-between gap-6 border-t border-ink-100 pt-4 text-xs text-ink-500">
         <div>
           <p className="font-semibold text-ink-700">{siteConfig.name}</p>
-          {footerLocation ? <p>{footerLocation}</p> : null}
-          {contact.email ? <p>{contact.email}</p> : null}
+          {footerLocation ? (
+            <p>
+              <Auto>{footerLocation}</Auto>
+            </p>
+          ) : null}
+          {contact.email ? (
+            <p>
+              <Ltr>{contact.email}</Ltr>
+            </p>
+          ) : null}
         </div>
         <p className="text-ink-400">
-          {t(locale, "invoice.file")}: invoice-{orderRef}.pdf
+          {t(locale, "invoice.file")}: <Ltr>invoice-{orderRef}.pdf</Ltr>
         </p>
       </div>
     </div>

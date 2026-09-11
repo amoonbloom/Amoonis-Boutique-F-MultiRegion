@@ -18,9 +18,8 @@ import {
   ORDER_STATUSES,
   ORDER_STATUS_LABEL_KEY,
   ORDER_STATUS_TONE,
-  PAYMENT_STATUS_LABEL_KEY,
-  PAYMENT_STATUS_TONE,
 } from "./orderStatus";
+import { orderPaymentContext } from "@/features/orders/constants";
 import { OrderExportDialog } from "./OrderExportDialog";
 import { customerName, customerEmail, customerLabel, isGuestOrder } from "./orderCustomer";
 import type { ApiOrderListRow, OrderStatus } from "@/features/orders/types";
@@ -93,18 +92,19 @@ export function OrdersAdminPage() {
     {
       key: "status",
       header: t("admin.status"),
-      cell: (o) => (
-        <div className="flex flex-col items-start gap-1">
-          <Badge tone={ORDER_STATUS_TONE[o.status]}>
-            {t(ORDER_STATUS_LABEL_KEY[o.status])}
-          </Badge>
-          {o.paymentStatus ? (
-            <Badge tone={PAYMENT_STATUS_TONE[o.paymentStatus]}>
-              {t(PAYMENT_STATUS_LABEL_KEY[o.paymentStatus])}
+      cell: (o) => {
+        // Payment context (COD vs failed online, etc.) alongside the fulfilment
+        // status, so the sales team can triage a PENDING_PAYMENT row at a glance.
+        const pay = orderPaymentContext(o.paymentMethod, o.paymentStatus);
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <Badge tone={ORDER_STATUS_TONE[o.status]}>
+              {t(ORDER_STATUS_LABEL_KEY[o.status])}
             </Badge>
-          ) : null}
-        </div>
-      ),
+            <Badge tone={pay.tone}>{t(pay.labelKey)}</Badge>
+          </div>
+        );
+      },
     },
     {
       key: "region",

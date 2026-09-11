@@ -1,5 +1,42 @@
-import type { OrderStatus, PaymentStatus } from "./types";
+import type { OrderStatus, PaymentStatus, PaymentMethod } from "./types";
 import type { MessageKey } from "@/i18n";
+
+type StatusTone =
+  | "neutral"
+  | "bloom"
+  | "blush"
+  | "gold"
+  | "success"
+  | "warning"
+  | "danger"
+  | "ink";
+
+/**
+ * A single, sales-friendly "payment context" tag combining the payment METHOD
+ * (COD vs online card) with its STATUS — so staff can tell, at a glance in the
+ * orders list, a normal COD order ("COD") from an online payment that FAILED
+ * ("Payment failed"). Both otherwise sit under the same PENDING_PAYMENT status.
+ */
+export function orderPaymentContext(
+  paymentMethod: PaymentMethod | undefined,
+  paymentStatus: PaymentStatus | undefined
+): { labelKey: MessageKey; tone: StatusTone } {
+  // Only online payments can fail — surface it prominently for follow-up.
+  if (paymentStatus === "FAILED") {
+    return { labelKey: "admin.ordersPage.payFailed", tone: "danger" };
+  }
+  if (paymentMethod === "COD") {
+    return {
+      labelKey: "admin.ordersPage.payCod",
+      tone: paymentStatus === "PAID" ? "success" : "neutral",
+    };
+  }
+  // Online (card / Apple Pay).
+  if (paymentStatus === "PAID") {
+    return { labelKey: "admin.ordersPage.payPaidOnline", tone: "success" };
+  }
+  return { labelKey: "admin.ordersPage.payAwaiting", tone: "warning" };
+}
 
 /**
  * Order-status constants shared by the admin panel and the storefront (account
