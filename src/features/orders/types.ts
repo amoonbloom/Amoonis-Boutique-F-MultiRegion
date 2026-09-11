@@ -234,6 +234,8 @@ export interface ApiOrderListRow {
   status: OrderStatus;
   /** Payment state snapshot. Absent on legacy list rows — treat as UNPAID. */
   paymentStatus?: PaymentStatus;
+  /** How the customer chose to pay (COD vs online). Absent on legacy list rows — treat as COD. */
+  paymentMethod?: PaymentMethod;
   itemCount: number;
   createdAt: string;
   updatedAt: string;
