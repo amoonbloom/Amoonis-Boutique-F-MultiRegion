@@ -112,6 +112,27 @@ export const ordersApi = {
     return data.data;
   },
 
+  // Streams a SINGLE order's invoice as a file (currently Excel only — the PDF
+  // is generated client-side from the rendered invoice so Arabic shapes for
+  // free). `lang` picks the invoice's language independently of the admin's UI
+  // locale. Returns the server's filename (Content-Disposition) with the blob.
+  async invoiceFile(
+    id: string,
+    params: { format: "xlsx"; lang: "en" | "ar" }
+  ): Promise<{ blob: Blob; filename: string }> {
+    const response = await http.get<Blob>(`/orders/${id}/invoice`, {
+      params,
+      responseType: "blob",
+    });
+    return {
+      blob: response.data,
+      filename: filenameFromContentDisposition(
+        response.headers["content-disposition"],
+        `invoice-${id}.${params.format}`
+      ),
+    };
+  },
+
   // Streams the Excel/PDF report directly as the response body. Returns the
   // server's own filename (from Content-Disposition) alongside the blob so
   // callers don't need to invent one — pairs with lib/download.ts.

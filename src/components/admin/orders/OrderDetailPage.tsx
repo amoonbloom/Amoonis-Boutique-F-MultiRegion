@@ -15,6 +15,7 @@ import {
   PAYMENT_STATUS_LABEL_KEY,
   PAYMENT_STATUS_TONE,
 } from "./orderStatus";
+import { OrderInvoiceDownload } from "./OrderInvoiceDownload";
 import { SelectedOptions } from "@/features/products/components/SelectedOptions";
 import { OrderItemExtras } from "@/features/orders/components/OrderItemExtras";
 import { useToast } from "@/hooks/useToast";
@@ -88,7 +89,7 @@ export function OrderDetailPage({ id }: { id: string }) {
           { label: order.id.slice(0, 8) },
         ]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge tone={ORDER_STATUS_TONE[order.status]}>
               {t(ORDER_STATUS_LABEL_KEY[order.status])}
             </Badge>
@@ -97,6 +98,7 @@ export function OrderDetailPage({ id }: { id: string }) {
                 {t(PAYMENT_STATUS_LABEL_KEY[order.paymentStatus])}
               </Badge>
             ) : null}
+            <OrderInvoiceDownload order={order} />
           </div>
         }
       />
