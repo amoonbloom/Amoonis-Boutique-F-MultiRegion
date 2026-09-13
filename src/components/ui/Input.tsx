@@ -5,6 +5,8 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   hint?: string;
   error?: string;
+  /** Shows a red asterisk after the label for required fields. */
+  requiredMark?: boolean;
   leadingIcon?: ReactNode;
   trailingIcon?: ReactNode;
   containerClassName?: string;
@@ -15,6 +17,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     label,
     hint,
     error,
+    requiredMark,
     leadingIcon,
     trailingIcon,
     id,
@@ -44,6 +47,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-700"
         >
           {label}
+          {requiredMark ? (
+            <span className="ms-0.5 text-(--color-danger)" aria-hidden="true">
+              *
+            </span>
+          ) : null}
         </label>
       )}
       <div

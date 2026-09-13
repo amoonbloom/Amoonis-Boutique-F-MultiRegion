@@ -11,7 +11,7 @@
 export const SHORT_ADDRESS_REGEX = /^[A-Z]{4}[0-9]{4}$/;
 
 /** Shown in the input so the expected shape is obvious at a glance. */
-export const SHORT_ADDRESS_PLACEHOLDER = "JHRC3674";
+export const SHORT_ADDRESS_PLACEHOLDER = "ABCD1234";
 
 export const SHORT_ADDRESS_LENGTH = 8;
 

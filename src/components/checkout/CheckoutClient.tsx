@@ -1045,6 +1045,7 @@ function BillingShippingCard({
 }: BillingShippingCardProps) {
   const { t, locale: uiLocale } = useT();
   const phoneField = regNewAddr("phone");
+  const zoneRequired = !zonesLoading && zones.length > 0;
   return (
     <Card variant="flat" padding="lg" className="flex flex-col gap-5">
       <header>
@@ -1111,6 +1112,7 @@ function BillingShippingCard({
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
             label={t("checkout.fullName")}
+            requiredMark
             autoComplete="name"
             error={newAddrErrors.fullName?.message}
             containerClassName="sm:col-span-2"
@@ -1118,6 +1120,7 @@ function BillingShippingCard({
           />
           <Input
             label={t("checkout.area")}
+            requiredMark
             placeholder={t("checkout.areaPlaceholder")}
             hint={t("checkout.areaHint")}
             error={newAddrErrors.area?.message}
@@ -1129,6 +1132,11 @@ function BillingShippingCard({
               className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500"
             >
               {regionCode === "UAE" ? t("checkout.emirate") : t("checkout.province")}
+              {zoneRequired ? (
+                <span className="ms-0.5 text-(--color-danger)" aria-hidden="true">
+                  *
+                </span>
+              ) : null}
             </label>
             {zonesLoading ? (
               <div className="flex h-12 w-full items-center rounded-2xl border border-ink-200 px-4">
@@ -1158,12 +1166,33 @@ function BillingShippingCard({
               </p>
             ) : null}
           </div>
+          {/* Saudi National Address — required; placed above phone as requested. */}
+          <Input
+            label={t("checkout.shortAddress")}
+            requiredMark
+            hint={t("checkout.shortAddressHint")}
+            placeholder={SHORT_ADDRESS_PLACEHOLDER}
+            dir="ltr"
+            inputMode="text"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={SHORT_ADDRESS_LENGTH}
+            value={shortAddress}
+            onChange={(e) => onShortAddressChange(maskShortAddress(e.target.value))}
+            error={shortAddressError ?? undefined}
+            className="uppercase tracking-[0.18em]"
+            containerClassName="sm:col-span-2"
+          />
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor="checkout-phone"
               className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500"
             >
               {t("checkout.phone")}
+              <span className="ms-0.5 text-(--color-danger)" aria-hidden="true">
+                *
+              </span>
             </label>
             <div
               dir="ltr"
@@ -1207,27 +1236,27 @@ function BillingShippingCard({
             />
           ) : null}
         </div>
-      ) : null}
-
-      {/* Saudi National Address short code — REQUIRED for every order, so it sits
-          outside the new-address form: a customer shipping to a saved address (which
-          may predate this field) must still provide it. The input masks as you type,
-          so a digit can never land in the first four positions. */}
-      <Input
-        label={t("checkout.shortAddress")}
-        hint={t("checkout.shortAddressHint")}
-        placeholder={SHORT_ADDRESS_PLACEHOLDER}
-        dir="ltr"
-        inputMode="text"
-        autoCapitalize="characters"
-        autoComplete="off"
-        spellCheck={false}
-        maxLength={SHORT_ADDRESS_LENGTH}
-        value={shortAddress}
-        onChange={(e) => onShortAddressChange(maskShortAddress(e.target.value))}
-        error={shortAddressError ?? undefined}
-        className="uppercase tracking-[0.18em]"
-      />
+      ) : (
+        /* Saved address path — National Address is still required (addresses may
+           predate this field), so keep the input visible when a saved address is
+           selected. */
+        <Input
+          label={t("checkout.shortAddress")}
+          requiredMark
+          hint={t("checkout.shortAddressHint")}
+          placeholder={SHORT_ADDRESS_PLACEHOLDER}
+          dir="ltr"
+          inputMode="text"
+          autoCapitalize="characters"
+          autoComplete="off"
+          spellCheck={false}
+          maxLength={SHORT_ADDRESS_LENGTH}
+          value={shortAddress}
+          onChange={(e) => onShortAddressChange(maskShortAddress(e.target.value))}
+          error={shortAddressError ?? undefined}
+          className="uppercase tracking-[0.18em]"
+        />
+      )}
 
       {/* Offer sign-in to guests — optional, never blocks checkout. */}
       {!isAuthed ? (
