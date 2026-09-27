@@ -63,6 +63,44 @@ function deriveMessage(error: AxiosError<ApiErrorPayload>): string {
   return error.message || "Something went wrong. Please try again.";
 }
 
+/**
+ * Catalog reads are PUBLIC endpoints that the backend makes STAFF-AWARE
+ * (`attachStaffIfPresent` + `buildVisibilityWhere`): a request carrying an
+ * admin/manager token bypasses the PUBLISHED filter and the ENTIRE_STORE
+ * draft-category filter, so it returns DRAFT content.
+ *
+ * That is correct for the admin panel, but wrong on the STOREFRONT. The Shop
+ * listing is fetched CLIENT-side (so it would carry the staff token and show
+ * drafts), while a product page is rendered SERVER-side with no token at all
+ * (anonymous -> 404). A signed-in admin therefore saw draft products in Shop
+ * that 404'd the moment they clicked one.
+ *
+ * Fix: on the storefront, send catalog reads ANONYMOUSLY so staff browse
+ * exactly what customers see. The admin panel lives at an UNPREFIXED /admin/*
+ * path (the storefront is always /:region/:locale/*), so it keeps its token and
+ * still sees drafts. Server-side catalog fetches were already anonymous.
+ */
+const PUBLIC_CATALOG_PATHS = [
+  "/products",
+  "/categories",
+  "/sections",
+  "/banners",
+];
+
+function isStorefrontCatalogRead(config: InternalAxiosRequestConfig): boolean {
+  // Server rendering never attaches a token anyway — leave that path untouched.
+  if (typeof window === "undefined") return false;
+  // Admin panel: keep the token so staff screens still list DRAFT content.
+  if (window.location.pathname.startsWith("/admin")) return false;
+  const method = (config.method ?? "get").toLowerCase();
+  if (method !== "get") return false;
+  // `url` is relative to baseURL (e.g. "/products/123"); strip any query string.
+  const path = (config.url ?? "").split("?")[0];
+  return PUBLIC_CATALOG_PATHS.some(
+    (base) => path === base || path.startsWith(`${base}/`)
+  );
+}
+
 function createHttpClient(): AxiosInstance {
   const instance = axios.create({
     baseURL: env.NEXT_PUBLIC_API_URL,
@@ -72,7 +110,7 @@ function createHttpClient(): AxiosInstance {
 
   instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const token = storage.get<string>(STORAGE_KEYS.authToken);
-    if (token && config.headers) {
+    if (token && config.headers && !isStorefrontCatalogRead(config)) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     // Region scoping: the backend reads `X-Region` (a region code) to decide
