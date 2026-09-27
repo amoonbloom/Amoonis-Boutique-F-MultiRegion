@@ -15,14 +15,24 @@ import { getServerT } from "@/i18n/server";
 import { getServerRegion } from "@/services/serverRegion";
 import { getCachedCategories, getCachedRegions } from "@/services/catalogCache";
 
-/** Resolves a footer shop-column link to a real category, falling back to
- * the full shop page if that category isn't found (e.g. renamed/removed). */
+/**
+ * Resolves a footer shop-column link to a real category, or null when that
+ * category isn't publicly visible.
+ *
+ * The labels in the shop column are hardcoded, but `getCachedCategories()`
+ * returns only what the STOREFRONT may see — so a category that is renamed,
+ * removed, or set to DRAFT simply isn't in the list. Previously this fell back
+ * to the full shop page, which meant a hidden (draft) category kept advertising
+ * itself in the footer of every page and dumped the customer on /shop, where
+ * its products don't exist. Returning null lets the caller drop the link
+ * entirely instead.
+ */
 function categoryHref(
   categories: { id: string; title?: string }[],
   pattern: RegExp
-) {
+): string | null {
   const match = categories.find((c) => pattern.test(c.title ?? ""));
-  return match ? ROUTES.category(match.id) : ROUTES.shop;
+  return match ? ROUTES.category(match.id) : null;
 }
 
 function FooterLink({ href, label }: { href: string; label: string }) {
@@ -79,24 +89,30 @@ export async function Footer() {
     },
     {
       title: t("footer.shop"),
-      links: [
-        {
-          href: categoryHref(categories, /gift\s*box/i),
-          label: t("footer.giftBoxes"),
-        },
-        {
-          href: categoryHref(categories, /flower\s*bouquet/i),
-          label: t("footer.flowerBouquets"),
-        },
-        {
-          href: categoryHref(categories, /flower\s*mug/i),
-          label: t("footer.flowerMugs"),
-        },
-        {
-          href: categoryHref(categories, /newborn/i),
-          label: t("footer.newbornGifts"),
-        },
-      ],
+      // A category that isn't publicly visible (DRAFT, renamed, removed) resolves
+      // to null and is DROPPED here — otherwise the footer of every page keeps
+      // advertising a hidden category and sends the customer to a shop page that
+      // doesn't contain its products.
+      links: (
+        [
+          {
+            href: categoryHref(categories, /gift\s*box/i),
+            label: t("footer.giftBoxes"),
+          },
+          {
+            href: categoryHref(categories, /flower\s*bouquet/i),
+            label: t("footer.flowerBouquets"),
+          },
+          {
+            href: categoryHref(categories, /flower\s*mug/i),
+            label: t("footer.flowerMugs"),
+          },
+          {
+            href: categoryHref(categories, /newborn/i),
+            label: t("footer.newbornGifts"),
+          },
+        ] as { href: string | null; label: string }[]
+      ).filter((l): l is { href: string; label: string } => l.href !== null),
     },
   ];
 
