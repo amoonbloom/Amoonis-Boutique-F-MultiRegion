@@ -8,9 +8,14 @@ import type {
 } from "../types";
 
 export const sectionsApi = {
-  async list(region?: string): Promise<ApiSection[]> {
+  // `zone` is the delivery-zone NAME. A section embeds products/categories, so without
+  // it a section payload is a side door around zone hiding on server-rendered pages.
+  async list(region?: string, zone?: string): Promise<ApiSection[]> {
+    const params: Record<string, string> = {};
+    if (region) params.region = region;
+    if (zone) params.zone = zone;
     const { data } = await http.get<PaginatedResponse<ApiSection>>("/sections", {
-      params: region ? { region } : undefined,
+      params: Object.keys(params).length ? params : undefined,
     });
     return data.data;
   },
