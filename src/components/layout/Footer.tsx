@@ -12,7 +12,7 @@ import { EmailLink, PhoneLink } from "@/components/ui/ContactLink";
 import { siteConfig } from "@/config/site";
 import { ROUTES } from "@/constants/routes";
 import { getServerT } from "@/i18n/server";
-import { getServerRegion } from "@/services/serverRegion";
+import { getServerRegion, getServerZoneName } from "@/services/serverRegion";
 import { getCachedCategories, getCachedRegions } from "@/services/catalogCache";
 
 /**
@@ -56,7 +56,10 @@ export async function Footer() {
   const regionCode = await getServerRegion();
   const [{ t, locale }, categories, regions] = await Promise.all([
     getServerT(),
-    getCachedCategories().catch(() => []),
+    // Pass the REGION as well as the zone: the backend resolves a zone NAME within a
+    // region, so a region-less call leaves the zone unresolved and the footer keeps
+    // linking a category that is hidden in the visitor's zone.
+    getCachedCategories(regionCode, await getServerZoneName()).catch(() => []),
     getCachedRegions().catch(() => []),
   ]);
 

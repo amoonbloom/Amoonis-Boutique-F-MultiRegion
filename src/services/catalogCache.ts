@@ -37,14 +37,29 @@ const PRODUCTS_TTL = 60; // 1 min: product lists & detail
 
 const r = (region?: string) => region ?? "default";
 
+/**
+ * Cache-key form of the selected delivery-zone NAME.
+ *
+ * The zone is passed IN by the caller (server components read it with
+ * `getServerZoneName()`), never read here: this module is reachable from graphs that
+ * are not Server Components, so it cannot import `next/headers`. It must be part of
+ * the CACHE KEY — otherwise one zone's filtered catalog would be served to visitors
+ * in every other zone.
+ */
+const z = (zone?: string) => zone ?? "none";
+
+
 // --- Categories -----------------------------------------------------------
 
 const _categories = unstable_cache(
-  (region?: string) => categoriesApi.list(region),
+  (region: string | undefined, zoneKey: string) =>
+    categoriesApi.list(region, zoneKey === "none" ? undefined : zoneKey),
   ["catalog:categories"],
   { revalidate: CATALOG_TTL, tags: ["categories"] }
 );
-export const getCachedCategories = cache((region?: string) => _categories(region));
+export const getCachedCategories = cache((region?: string, zone?: string) =>
+  _categories(region, z(zone))
+);
 
 const _categoryById = unstable_cache(
   async (region: string | undefined, id: string) => {
@@ -70,14 +85,19 @@ export const getCachedCategoryById = cache((region: string | undefined, id: stri
 // --- Products -------------------------------------------------------------
 
 const _productList = unstable_cache(
-  (region: string | undefined, page: number, limit: number) =>
-    productsApi.list({ page, limit, region }),
+  (region: string | undefined, page: number, limit: number, zoneKey: string) =>
+    productsApi.list({
+      page,
+      limit,
+      region,
+      ...(zoneKey === "none" ? {} : { zone: zoneKey }),
+    }),
   ["catalog:product-list"],
   { revalidate: PRODUCTS_TTL, tags: ["products"] }
 );
 export const getCachedProductList = cache(
-  (region: string | undefined, page = 1, limit = 24) =>
-    _productList(r(region), page, limit)
+  (region: string | undefined, page = 1, limit = 24, zone?: string) =>
+    _productList(r(region), page, limit, z(zone))
 );
 
 const _productsByCategory = unstable_cache(
@@ -115,11 +135,14 @@ export const getCachedProductById = cache(
 // --- Home content ---------------------------------------------------------
 
 const _sections = unstable_cache(
-  (region?: string) => sectionsApi.list(region),
+  (region: string | undefined, zoneKey: string) =>
+    sectionsApi.list(region, zoneKey === "none" ? undefined : zoneKey),
   ["catalog:sections"],
   { revalidate: CATALOG_TTL, tags: ["sections"] }
 );
-export const getCachedSections = cache((region?: string) => _sections(region));
+export const getCachedSections = cache((region?: string, zone?: string) =>
+  _sections(region, z(zone))
+);
 
 const _banners = unstable_cache(
   (region: string, platform: "MOBILE" | "WEB") =>
