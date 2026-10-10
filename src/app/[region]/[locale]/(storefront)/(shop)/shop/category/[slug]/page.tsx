@@ -10,7 +10,7 @@ import {
 import { toUiCategory } from "@/features/categories/adapters";
 import { toUiProducts } from "@/features/products/adapters";
 import { ROUTES } from "@/constants/routes";
-import { getServerRegion } from "@/services/serverRegion";
+import { getServerRegion, getServerZoneName } from "@/services/serverRegion";
 import { getServerLocale } from "@/i18n/server";
 import { t, tCount } from "@/i18n";
 import { siteConfig } from "@/config/site";
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: CategoryPageProps) {
   );
   try {
     const region = await getServerRegion();
-    const api = await getCachedCategoryById(region, slug);
+    const api = await getCachedCategoryById(region, slug, await getServerZoneName());
     if (!api) return { alternates };
     return {
       title: api.title,
@@ -54,10 +54,11 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   // 404 → null from the cache layer (see catalogCache); other errors still
   // throw to the error boundary. Non-existent category → real 404.
-  const categoryApi = await getCachedCategoryById(region, slug);
+  const zone = await getServerZoneName();
+  const categoryApi = await getCachedCategoryById(region, slug, zone);
   if (!categoryApi) notFound();
 
-  const productPage = await getCachedProductsByCategory(region, slug, 24).catch(
+  const productPage = await getCachedProductsByCategory(region, slug, 24, zone).catch(
     () => ({ data: [], meta: {} })
   );
 

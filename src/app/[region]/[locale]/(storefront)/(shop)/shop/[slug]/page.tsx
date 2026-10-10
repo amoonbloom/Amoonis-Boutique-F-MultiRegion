@@ -88,7 +88,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   let related: ReturnType<typeof toUiProducts> = [];
   if (api.categoryId) {
     try {
-      const page = await getCachedProductsByCategory(region, api.categoryId, 8);
+      const page = await getCachedProductsByCategory(region, api.categoryId, 8, zoneName);
       related = toUiProducts(
         page.data.filter((p) => p.id !== api.id).slice(0, 4),
         { locale }

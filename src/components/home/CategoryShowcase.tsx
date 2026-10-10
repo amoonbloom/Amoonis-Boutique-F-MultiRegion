@@ -35,7 +35,7 @@ export async function CategoryShowcase() {
     featured.map(async (cat) => {
       if (cat.image.url.startsWith("http")) return { cat, fallbackImage: undefined };
       try {
-        const page = await getCachedProductsByCategory(region, cat.id, 1);
+        const page = await getCachedProductsByCategory(region, cat.id, 1, zone);
         const p = page.data?.[0];
         return { cat, fallbackImage: p?.images?.[0] ?? p?.image ?? undefined };
       } catch {

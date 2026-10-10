@@ -62,9 +62,9 @@ export const getCachedCategories = cache((region?: string, zone?: string) =>
 );
 
 const _categoryById = unstable_cache(
-  async (region: string | undefined, id: string) => {
+  async (region: string | undefined, id: string, zoneKey: string) => {
     try {
-      return await categoriesApi.getById(id, region);
+      return await categoriesApi.getById(id, region, zoneKey === "none" ? undefined : zoneKey);
     } catch (e) {
       // A genuine 404 (category doesn't exist / not in this region) is a
       // cacheable "not found" → return null so the page renders a real 404
@@ -78,8 +78,9 @@ const _categoryById = unstable_cache(
   ["catalog:category-by-id"],
   { revalidate: CATALOG_TTL, tags: ["categories"] }
 );
-export const getCachedCategoryById = cache((region: string | undefined, id: string) =>
-  _categoryById(r(region), id)
+export const getCachedCategoryById = cache(
+  (region: string | undefined, id: string, zone?: string) =>
+    _categoryById(r(region), id, z(zone))
 );
 
 // --- Products -------------------------------------------------------------
@@ -101,14 +102,18 @@ export const getCachedProductList = cache(
 );
 
 const _productsByCategory = unstable_cache(
-  (region: string | undefined, categoryId: string, limit: number) =>
-    productsApi.listByCategory(categoryId, { limit, region }),
+  (region: string | undefined, categoryId: string, limit: number, zoneKey: string) =>
+    productsApi.listByCategory(categoryId, {
+      limit,
+      region,
+      ...(zoneKey === "none" ? {} : { zone: zoneKey }),
+    }),
   ["catalog:products-by-category"],
   { revalidate: PRODUCTS_TTL, tags: ["products"] }
 );
 export const getCachedProductsByCategory = cache(
-  (region: string | undefined, categoryId: string, limit = 24) =>
-    _productsByCategory(r(region), categoryId, limit)
+  (region: string | undefined, categoryId: string, limit = 24, zone?: string) =>
+    _productsByCategory(r(region), categoryId, limit, z(zone))
 );
 
 const _productById = unstable_cache(
