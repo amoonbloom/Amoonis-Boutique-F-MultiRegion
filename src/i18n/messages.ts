@@ -1007,6 +1007,9 @@ export const messages = {
           "Optional: override the delivery days for a specific zone. Blank = use the region/category value above.",
         zoneNoZonesNote: "No delivery zones for this region.",
         zoneVisibilityHeading: "Hide in zones",
+        zoneComingSoonHeading: "Coming soon in zones",
+        zoneComingSoonHint:
+          "Tick a zone to make this a teaser there — still visible, but customers delivering to that zone can't order it. Leave all unchecked to sell it in every zone it's available.",
         zoneVisibilityHint:
           "Tick a zone to hide this from the storefront there. Customers delivering to that zone won't see it, and checkout will refuse the order.",
         zoneCashArrangementFeeStepAmountLabel: "{zone} — fee step",
@@ -1159,6 +1162,9 @@ export const messages = {
           "Optional: override the delivery days for a specific zone. Blank = use the region/product value.",
         zoneNoZonesNote: "No delivery zones for this region.",
         zoneVisibilityHeading: "Hide in zones",
+        zoneComingSoonHeading: "Coming soon in zones",
+        zoneComingSoonHint:
+          "Tick a zone to make this a teaser there — still visible, but customers delivering to that zone can't order it. Leave all unchecked to sell it in every zone it's available.",
         zoneVisibilityHint:
           "Tick a zone to hide this from the storefront there. Customers delivering to that zone won't see it, and checkout will refuse the order.",
         zoneCashArrangementFeeStepAmountLabel: "{zone} — fee step",
@@ -3066,6 +3072,9 @@ export const messages = {
           "اختياري: تجاوز أيام التوصيل لمنطقة فرعية محددة. اتركه فارغًا لاستخدام قيمة المنطقة/الفئة أعلاه.",
         zoneNoZonesNote: "لا توجد مناطق فرعية لهذه المنطقة.",
         zoneVisibilityHeading: "إخفاء في مناطق فرعية",
+        zoneComingSoonHeading: "قريباً في مناطق فرعية",
+        zoneComingSoonHint:
+          "حدّد منطقة فرعية ليظهر هذا العنصر فيها دون إمكانية الطلب. اتركها جميعاً بدون تحديد ليُباع في كل منطقة فرعية متاح فيها.",
         zoneVisibilityHint:
           "حدّد منطقة فرعية لإخفاء هذا العنصر من المتجر فيها. لن يراه العملاء الذين يطلبون التوصيل إلى تلك المنطقة، وسيرفض الدفع الطلب.",
         zoneCashArrangementFeeStepAmountLabel: "{zone} — خطوة الرسوم",
@@ -3216,6 +3225,9 @@ export const messages = {
           "اختياري: تجاوز أيام التوصيل لمنطقة فرعية محددة. اتركه فارغا لاستخدام قيمة المنطقة/المنتج.",
         zoneNoZonesNote: "لا توجد مناطق فرعية لهذه المنطقة.",
         zoneVisibilityHeading: "إخفاء في مناطق فرعية",
+        zoneComingSoonHeading: "قريباً في مناطق فرعية",
+        zoneComingSoonHint:
+          "حدّد منطقة فرعية ليظهر هذا العنصر فيها دون إمكانية الطلب. اتركها جميعاً بدون تحديد ليُباع في كل منطقة فرعية متاح فيها.",
         zoneVisibilityHint:
           "حدّد منطقة فرعية لإخفاء هذا العنصر من المتجر فيها. لن يراه العملاء الذين يطلبون التوصيل إلى تلك المنطقة، وسيرفض الدفع الطلب.",
         zoneCashArrangementFeeStepAmountLabel: "{zone} — خطوة الرسوم",

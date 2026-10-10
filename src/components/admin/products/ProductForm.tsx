@@ -256,6 +256,9 @@ function useProductFormSchema() {
       // WHOLE form. handleSubmit() has no onInvalid handler, so that surfaced as a
       // "Save changes" button that silently did nothing.
       hiddenZones: z.record(z.string(), z.boolean().optional()).optional(),
+      // zoneId -> true means "teaser in that zone": visible there but not orderable.
+      // Same tolerant shape as hiddenZones, for the same reason.
+      comingSoonZones: z.record(z.string(), z.boolean().optional()).optional(),
       // Per-zone cash-arrangement fee schedule overrides — kept as sibling records (not
       // merged into zoneLeadDays' bare-number shape) so the existing lead-days state
       // stays untouched; merged back into one combined array at submit time.
@@ -320,6 +323,7 @@ const emptyDefaults: ProductFormValues = {
   regionPrices: {},
   zoneLeadDays: {},
   hiddenZones: {},
+  comingSoonZones: {},
   zoneCashArrangementFeeStepAmount: {},
   zoneCashArrangementFeeMarginPercent: {},
   giftCardEnabled: false,
@@ -434,6 +438,11 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
       hiddenZones: Object.fromEntries(
         (initial.zoneLeadDays ?? [])
           .filter((zl) => zl.hidden)
+          .map((zl) => [zl.zoneId, true])
+      ),
+      comingSoonZones: Object.fromEntries(
+        (initial.zoneLeadDays ?? [])
+          .filter((zl) => zl.comingSoon)
           .map((zl) => [zl.zoneId, true])
       ),
       zoneCashArrangementFeeStepAmount: Object.fromEntries(
@@ -659,6 +668,7 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
         const zoneIds = new Set([
           ...Object.keys(values.zoneLeadDays ?? {}),
           ...Object.keys(values.hiddenZones ?? {}),
+          ...Object.keys(values.comingSoonZones ?? {}),
           ...Object.keys(values.zoneCashArrangementFeeStepAmount ?? {}),
           ...Object.keys(values.zoneCashArrangementFeeMarginPercent ?? {}),
         ]);
@@ -672,11 +682,13 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
           // same join table, so a zone that is only hidden (no lead/fee override)
           // must still be written or the hide is silently dropped.
           const hidden = values.hiddenZones?.[zoneId] === true;
+          const comingSoon = values.comingSoonZones?.[zoneId] === true;
           if (
             deliveryLeadDays == null &&
             cashArrangementFeeStepAmount == null &&
             cashArrangementFeeMarginPercent == null &&
-            !hidden
+            !hidden &&
+            !comingSoon
           ) {
             continue;
           }
@@ -686,6 +698,7 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
             cashArrangementFeeStepAmount,
             cashArrangementFeeMarginPercent,
             hidden,
+            comingSoon,
           });
         }
         return rows;
@@ -1394,6 +1407,59 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
                             key={zone.id}
                             control={control}
                             name={`hiddenZones.${zone.id}`}
+                            render={({ field }) => (
+                              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 transition-colors hover:bg-cream-50">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-bloom-600"
+                                  checked={field.value === true}
+                                  // Always a real boolean — never undefined (see schema).
+                                  onChange={(e) => field.onChange(e.target.checked)}
+                                />
+                                <span className="text-sm text-ink-800">{zone.name}</span>
+                              </label>
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        ) : null}
+
+        {/* Per-zone teaser — the zone-level twin of the per-region "Coming soon"
+            above: the item still shows in these zones but cannot be ordered to them. */}
+        {selectedRegions.length > 0 ? (
+          <Card
+            title={t("admin.productForm.zoneComingSoonHeading")}
+            description={t("admin.productForm.zoneComingSoonHint")}
+            collapsible
+          >
+            <div className="flex flex-col gap-4">
+              {selectedRegions.map((region) => {
+                const regionZones = allZones.filter((z) => z.regionId === region.id);
+                return (
+                  <div
+                    key={region.id}
+                    className="border-t border-ink-100 pt-4 first:border-t-0 first:pt-0"
+                  >
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-ink-700">
+                      {region.name}
+                    </p>
+                    {regionZones.length === 0 ? (
+                      <p className="text-xs text-ink-400">
+                        {t("admin.productForm.zoneNoZonesNote")}
+                      </p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {regionZones.map((zone) => (
+                          <Controller
+                            key={zone.id}
+                            control={control}
+                            name={`comingSoonZones.${zone.id}`}
                             render={({ field }) => (
                               <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 transition-colors hover:bg-cream-50">
                                 <input
