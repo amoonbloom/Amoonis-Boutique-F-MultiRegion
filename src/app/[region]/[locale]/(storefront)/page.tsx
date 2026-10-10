@@ -6,6 +6,7 @@ import { TrustStrip } from "@/components/home/TrustStrip";
 import { BrandStory } from "@/components/home/BrandStory";
 import { SupportSection } from "@/components/home/SupportSection";
 import { Container } from "@/components/ui";
+import { getServerZoneName } from "@/services/serverRegion";
 
 /**
  * Home page — section order mirrors the client's live site:
@@ -13,20 +14,28 @@ import { Container } from "@/components/ui";
  *        → trust strip → brand story → support.
  * Data-backed sections stream inside <Suspense> so the shell paints instantly.
  */
-export default function HomePage() {
+export default async function HomePage() {
+  // Changing the delivery zone adds/removes catalog content, and LocationSheet
+  // calls router.refresh() so these Server Components re-render. Their reveal
+  // animations use `viewport: { once: true }`, so the observer has already fired
+  // by then and a re-rendered card can sit at its initial opacity: 0 forever —
+  // which reads as blank space where a category or product should be. Keying the
+  // boundaries by zone remounts the subtree instead, so the reveal replays and
+  // the new content fades in rather than leaving a hole.
+  const zoneKey = (await getServerZoneName()) ?? "none";
   return (
     <>
       <Suspense fallback={<HeroFallback />}>
         <Hero />
       </Suspense>
 
-      <Suspense fallback={<RowFallback cards={4} />}>
+      <Suspense key={`categories-${zoneKey}`} fallback={<RowFallback cards={4} />}>
         <CategoryShowcase />
       </Suspense>
 
       {/* Admin-managed product rails (Best sellers, New arrivals, …) in the
           order set in the admin Sections screen. */}
-      <Suspense fallback={<RowFallback cards={4} />}>
+      <Suspense key={`sections-${zoneKey}`} fallback={<RowFallback cards={4} />}>
         <HomeSections />
       </Suspense>
 
