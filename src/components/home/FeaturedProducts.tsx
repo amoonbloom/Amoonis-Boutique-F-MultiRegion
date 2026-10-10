@@ -26,7 +26,10 @@ export async function FeaturedProducts() {
     data: [],
     meta: {},
   }));
-  const featured = toUiProducts(page.data, { locale });
+  // Products of a coming-soon category are not listed at all.
+  const featured = toUiProducts(page.data, { locale }).filter(
+    (p) => !p.categoryComingSoon
+  );
 
   if (featured.length === 0) return null;
 

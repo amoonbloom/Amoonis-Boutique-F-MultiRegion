@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { LocalizedLink } from "@/components/ui/LocalizedLink";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Badge, CurrencyAmount } from "@/components/ui";
 import { BagIcon, StarIcon } from "@/components/icons";
 import { cn } from "@/lib/cn";
@@ -35,6 +35,41 @@ const badgeMap: Record<
   limited: { tone: "ink", key: "product.badgeLimited" },
   sale: { tone: "bloom", key: "product.badgeSale" },
 };
+
+/**
+ * The card's link to the product page — rendered as a plain element when the product is
+ * a coming-soon teaser. Such a product stays in the grid with its badge and a disabled
+ * add-to-cart, but must not navigate to a page the customer can't act on.
+ *
+ * Declared at module scope, not inside ProductCard: a component created during render is
+ * a new type on every render, so React would unmount and remount the whole subtree.
+ */
+function ProductLink({
+  slug,
+  disabled,
+  className,
+  children,
+  "aria-label": ariaLabel,
+}: {
+  slug: string;
+  disabled?: boolean;
+  className?: string;
+  children: ReactNode;
+  "aria-label"?: string;
+}) {
+  if (disabled) {
+    return (
+      <div className={className} aria-disabled="true" aria-label={ariaLabel}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <LocalizedLink href={ROUTES.product(slug)} className={className} aria-label={ariaLabel}>
+      {children}
+    </LocalizedLink>
+  );
+}
 
 export function ProductCard({ product, className, priority }: ProductCardProps) {
   const dispatch = useAppDispatch();
@@ -95,8 +130,9 @@ export function ProductCard({ product, className, priority }: ProductCardProps) 
         className
       )}
     >
-      <LocalizedLink
-        href={ROUTES.product(product.slug)}
+      <ProductLink
+        slug={product.slug}
+        disabled={product.comingSoon}
         className="relative block overflow-hidden rounded-2xl bg-blush-50 transition-transform duration-300 ease-out-soft will-change-transform group-hover:-translate-y-1"
         aria-label={product.title}
       >
@@ -189,7 +225,7 @@ export function ProductCard({ product, className, priority }: ProductCardProps) 
             </div>
           </>
         )}
-      </LocalizedLink>
+      </ProductLink>
 
       <div className="flex flex-col gap-1">
         {/* Category eyebrow — basic product detail only (matches the client's
@@ -199,12 +235,12 @@ export function ProductCard({ product, className, priority }: ProductCardProps) 
             {product.category}
           </p>
         )}
-        <LocalizedLink
-          href={ROUTES.product(product.slug)}
-          className="line-clamp-1 text-sm font-medium leading-snug tracking-tight text-ink-900 transition-colors hover:text-bloom-700 sm:text-base"
-        >
+        <ProductLink
+          slug={product.slug}
+          disabled={product.comingSoon}
+          className="line-clamp-1 text-sm font-medium leading-snug tracking-tight text-ink-900 transition-colors hover:text-bloom-700 sm:text-base">
           {product.title}
-        </LocalizedLink>
+        </ProductLink>
         <div className="mt-1 flex items-center justify-between gap-2">
           <div className="flex items-baseline gap-2">
             {product.priceRange ? (

@@ -66,7 +66,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   // Coming-soon products are never listed on the storefront (only released ones, which
   // the backend returns with comingSoon=false). A coming-soon CATEGORY shows a message
   // instead of a grid (below); a normal category just drops any coming-soon items.
-  const items = toUiProducts(productPage.data, { locale }).filter((p) => !p.comingSoon);
+  const items = toUiProducts(productPage.data, { locale }).filter((p) => !p.categoryComingSoon);
 
   return (
     <>

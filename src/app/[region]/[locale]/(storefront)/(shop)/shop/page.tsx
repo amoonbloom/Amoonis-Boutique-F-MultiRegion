@@ -91,7 +91,7 @@ export default async function ShopPage(props: PageProps<"/[region]/[locale]/shop
   // coming-soon) — matches the shop grid and the sum of the visible category counts.
   // Falls back to the raw listing total (search, or if the full fetch failed).
   const total = fullCatalog
-    ? fullCatalog.data.filter((p) => !(p.comingSoon || p.category?.comingSoon)).length
+    ? fullCatalog.data.filter((p) => !p.category?.comingSoon).length
     : (productPage.meta as { pagination?: { total?: number } } | undefined)
         ?.pagination?.total ?? productPage.data.length;
 

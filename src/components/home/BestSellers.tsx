@@ -32,7 +32,11 @@ export async function BestSellers() {
     : getCachedProductList(region, 1, 8, zone)
   ).catch(() => ({ data: [], meta: {} }));
 
-  const products = toUiProducts(page.data, { locale }).slice(0, 8);
+  // A coming-soon CATEGORY removes its products from listings entirely (a product's
+  // own teaser stays, badged). Filter BEFORE slicing so the rail still fills to 8.
+  const products = toUiProducts(page.data, { locale })
+    .filter((p) => !p.categoryComingSoon)
+    .slice(0, 8);
 
   return (
     <ProductRail

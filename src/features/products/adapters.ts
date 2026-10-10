@@ -136,9 +136,11 @@ export function toUiProduct(api: ApiProduct, opts: ToUiProductOptions = {}): Pro
     category: categoryTitle,
     categorySlug,
     inStock: api.quantity > 0,
-    // Effective coming-soon = the product's own flag OR its category's (cascade). Use
-    // `||` not `??`: comingSoon serializes as `false`, so `??` would never fall through.
-    comingSoon: Boolean(api.comingSoon || api.category?.comingSoon),
+    // The two tiers are kept SEPARATE because they render differently: the product's
+    // own teaser stays listed (badge, not clickable), while a category teaser removes
+    // its products from listings altogether.
+    comingSoon: Boolean(api.comingSoon),
+    categoryComingSoon: Boolean(api.category?.comingSoon),
     // Effective on-sale = the product's resolved flag (backend already ORs own/category/
     // section on storefront reads) OR the category cascade as a fallback. Visual only.
     onSale: Boolean(api.onSale || api.category?.onSale),
