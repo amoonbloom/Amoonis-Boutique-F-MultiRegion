@@ -57,7 +57,7 @@ export async function HomeSections() {
     // released product comes back with comingSoon=false from the backend, so this drops
     // exactly the un-released coming-soon items.
     const products = toUiProducts(page.data, { locale })
-      .filter((p) => !p.comingSoon)
+      .filter((p) => !p.categoryComingSoon)
       .slice(0, PRODUCTS_PER_SECTION);
     return (
       <ProductRail
@@ -81,7 +81,7 @@ export async function HomeSections() {
         // ("Sell these products even if their category is coming soon") — the backend
         // then returns it with comingSoon=false. Un-released coming-soon items are hidden.
         const products = toUiProducts(section.products, { locale })
-          .filter((p) => !p.comingSoon)
+          .filter((p) => !p.categoryComingSoon)
           .slice(0, sectionRenderCount(display));
         if (products.length === 0) return null;
         return (

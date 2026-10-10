@@ -20,7 +20,10 @@ export async function NewArrivals() {
     data: [],
     meta: {},
   }));
-  const products = toUiProducts(page.data, { locale });
+  // Products of a coming-soon category are not listed at all.
+  const products = toUiProducts(page.data, { locale }).filter(
+    (p) => !p.categoryComingSoon
+  );
 
   return (
     <ProductRail

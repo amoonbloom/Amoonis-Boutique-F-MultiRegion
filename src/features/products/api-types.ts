@@ -138,6 +138,10 @@ export interface ApiProductZoneLead {
    *  order delivering there. Absent/false on every pre-existing row — these zone
    *  entries originally only carried lead-time / fee overrides. */
   hidden?: boolean;
+  /** ZONE TEASER: true shows this in the zone but blocks ordering there, mirroring the
+   *  per-region comingSoon one tier down. The effective state is the OR of the global,
+   *  per-region and per-zone flags, so a zone can only ADD a teaser, never clear one. */
+  comingSoon?: boolean;
 }
 
 export interface ApiProduct {

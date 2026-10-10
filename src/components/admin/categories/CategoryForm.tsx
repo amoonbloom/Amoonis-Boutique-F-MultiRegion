@@ -93,6 +93,9 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
         // behind, and a strict boolean would invalidate the entire form — which shows
         // up as a Save button that does nothing (there is no onInvalid handler).
         hiddenZones: z.record(z.string(), z.boolean().optional()).optional(),
+        // zoneId -> true means "teaser in that zone": the category and its products
+        // stay visible there but cannot be ordered to it.
+        comingSoonZones: z.record(z.string(), z.boolean().optional()).optional(),
         zoneCashArrangementFeeStepAmount: z.record(z.string(), z.number().positive().nullish()),
         zoneCashArrangementFeeMarginPercent: z.record(z.string(), z.number().nonnegative().nullish()),
       }),
@@ -133,6 +136,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
       regionCashArrangementFeeMarginPercent: {},
       zoneLeadDays: {},
       hiddenZones: {},
+      comingSoonZones: {},
       zoneCashArrangementFeeStepAmount: {},
       zoneCashArrangementFeeMarginPercent: {},
     },
@@ -201,6 +205,9 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
       hiddenZones: Object.fromEntries(
         (initial.zoneLeadDays ?? []).filter((zl) => zl.hidden).map((zl) => [zl.zoneId, true])
       ),
+      comingSoonZones: Object.fromEntries(
+        (initial.zoneLeadDays ?? []).filter((zl) => zl.comingSoon).map((zl) => [zl.zoneId, true])
+      ),
       zoneCashArrangementFeeStepAmount: Object.fromEntries(
         (initial.zoneLeadDays ?? []).map((zl) => [zl.zoneId, zl.cashArrangementFeeStepAmount ?? null])
       ),
@@ -264,6 +271,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
         const zoneIds = new Set([
           ...Object.keys(values.zoneLeadDays ?? {}),
           ...Object.keys(values.hiddenZones ?? {}),
+          ...Object.keys(values.comingSoonZones ?? {}),
           ...Object.keys(values.zoneCashArrangementFeeStepAmount ?? {}),
           ...Object.keys(values.zoneCashArrangementFeeMarginPercent ?? {}),
         ]);
@@ -274,11 +282,13 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
           const cashArrangementFeeMarginPercent = values.zoneCashArrangementFeeMarginPercent?.[zoneId] ?? null;
           // A hide with no lead/fee override still needs its row written.
           const hidden = values.hiddenZones?.[zoneId] === true;
+          const comingSoon = values.comingSoonZones?.[zoneId] === true;
           if (
             deliveryLeadDays == null &&
             cashArrangementFeeStepAmount == null &&
             cashArrangementFeeMarginPercent == null &&
-            !hidden
+            !hidden &&
+            !comingSoon
           ) {
             continue;
           }
@@ -288,6 +298,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
             cashArrangementFeeStepAmount,
             cashArrangementFeeMarginPercent,
             hidden,
+            comingSoon,
           });
         }
         return rows;
@@ -587,6 +598,58 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
                             key={zone.id}
                             control={control}
                             name={`hiddenZones.${zone.id}`}
+                            render={({ field }) => (
+                              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 transition-colors hover:bg-cream-50">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-bloom-600"
+                                  checked={field.value === true}
+                                  onChange={(e) => field.onChange(e.target.checked)}
+                                />
+                                <span className="text-sm text-ink-800">{zone.name}</span>
+                              </label>
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </FormSection>
+        )}
+
+        {/* Per-zone teaser — zone-level twin of the per-region "Coming soon":
+            the category and its products stay visible but are not orderable there. */}
+        {selectedRegions.length > 0 && (
+          <FormSection
+            title={t("admin.categoryForm.zoneComingSoonHeading")}
+            description={t("admin.categoryForm.zoneComingSoonHint")}
+            collapsible
+          >
+            <div className="flex flex-col gap-4">
+              {selectedRegions.map((region) => {
+                const regionZones = allZones.filter((z) => z.regionId === region.id);
+                return (
+                  <div
+                    key={region.id}
+                    className="border-t border-ink-100 pt-4 first:border-t-0 first:pt-0"
+                  >
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-ink-700">
+                      {region.name}
+                    </p>
+                    {regionZones.length === 0 ? (
+                      <p className="text-xs text-ink-400">
+                        {t("admin.categoryForm.zoneNoZonesNote")}
+                      </p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {regionZones.map((zone) => (
+                          <Controller
+                            key={zone.id}
+                            control={control}
+                            name={`comingSoonZones.${zone.id}`}
                             render={({ field }) => (
                               <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 transition-colors hover:bg-cream-50">
                                 <input

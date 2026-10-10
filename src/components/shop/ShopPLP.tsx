@@ -247,7 +247,7 @@ export function ShopPLP({
       // search, section feeds). Only released products — which the backend returns
       // with comingSoon=false — reach the grid. Applied here so facets + counts derive
       // from the visible set too.
-      ).filter((p) => !p.comingSoon),
+      ).filter((p) => !p.categoryComingSoon),
     [data, uiLocale, currency]
   );
   const sourceTotal =
@@ -260,7 +260,7 @@ export function ShopPLP({
     () =>
       activeSection
         ? toUiProducts(activeSection.products, { locale: uiLocale, currency }).filter(
-            (p) => !p.comingSoon
+            (p) => !p.categoryComingSoon
           )
         : [],
     [activeSection, uiLocale, currency]
@@ -289,7 +289,7 @@ export function ShopPLP({
     const raw = facetQuery.data?.data;
     if (!raw) return baseList;
     return toUiProducts(raw, { locale: uiLocale, currency }).filter(
-      (p) => !p.comingSoon
+      (p) => !p.categoryComingSoon
     );
   }, [facetQuery.data, uiLocale, currency, baseList]);
 
@@ -319,7 +319,7 @@ export function ShopPLP({
     const raw = everythingCountQuery.data?.data;
     if (!raw) return catalogTotal ?? sourceTotal;
     return toUiProducts(raw, { locale: uiLocale, currency }).filter(
-      (p) => !p.comingSoon
+      (p) => !p.categoryComingSoon
     ).length;
   }, [
     isEverythingView,

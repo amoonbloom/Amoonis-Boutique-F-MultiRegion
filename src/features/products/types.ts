@@ -80,8 +80,14 @@ export interface Product {
   categorySlug: string;
   collection?: string;
   inStock: boolean;
-  /** Effective coming-soon (own OR inherited from category): visible but not orderable. */
+  /** The product's OWN teaser (global / per-region / per-zone, already resolved by the
+   *  backend). Such a product STAYS LISTED but shows a "Coming soon" badge and is not
+   *  clickable or orderable. */
   comingSoon?: boolean;
+  /** Its CATEGORY is a teaser. The whole category is presented as coming soon, so its
+   *  products are removed from listings entirely rather than shown with a badge —
+   *  which is why this is a separate flag from `comingSoon`. */
+  categoryComingSoon?: boolean;
   /** Effective on-sale (own OR category OR an on-sale section it's in): shows a Sale badge. */
   onSale?: boolean;
   /** Resolved Sale-badge text (already localized). Undefined = show the default "Sale". */
