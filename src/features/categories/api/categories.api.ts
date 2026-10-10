@@ -23,10 +23,13 @@ export const categoriesApi = {
     return data.data;
   },
 
-  async getById(id: string, region?: string): Promise<ApiCategoryDetail> {
+  async getById(id: string, region?: string, zone?: string): Promise<ApiCategoryDetail> {
+    const params: Record<string, string> = {};
+    if (region) params.region = region;
+    if (zone) params.zone = zone;
     const { data } = await http.get<ApiResponse<ApiCategoryDetail>>(
       `/categories/${id}`,
-      { params: region ? { region } : undefined }
+      { params: Object.keys(params).length ? params : undefined }
     );
     return data.data;
   },

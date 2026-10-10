@@ -28,7 +28,7 @@ export async function BestSellers() {
   );
 
   const page = await (giftBoxes
-    ? getCachedProductsByCategory(region, giftBoxes.id, 8)
+    ? getCachedProductsByCategory(region, giftBoxes.id, 8, zone)
     : getCachedProductList(region, 1, 8, zone)
   ).catch(() => ({ data: [], meta: {} }));
 
