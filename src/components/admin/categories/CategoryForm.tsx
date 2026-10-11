@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button, Input, Textarea } from "@/components/ui";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 import { RegionPicker } from "@/components/admin/RegionPicker";
+import { FormSection } from "@/components/admin/FormSection";
 import { Select } from "@/components/admin/Select";
 import { regionsApi } from "@/features/regions/api/regions.api";
 import { deliveryZonesApi } from "@/features/delivery-zones/api/delivery-zones.api";
@@ -87,6 +88,11 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
             .max(30, t("admin.categoryForm.deliveryLeadDaysInvalid"))
             .nullish()
         ),
+        // zoneId -> true means "hide this category (and its products) in that zone".
+        // Value is optional because clearing a checkbox can leave an `undefined`
+        // behind, and a strict boolean would invalidate the entire form — which shows
+        // up as a Save button that does nothing (there is no onInvalid handler).
+        hiddenZones: z.record(z.string(), z.boolean().optional()).optional(),
         zoneCashArrangementFeeStepAmount: z.record(z.string(), z.number().positive().nullish()),
         zoneCashArrangementFeeMarginPercent: z.record(z.string(), z.number().nonnegative().nullish()),
       }),
@@ -126,6 +132,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
       regionCashArrangementFeeStepAmount: {},
       regionCashArrangementFeeMarginPercent: {},
       zoneLeadDays: {},
+      hiddenZones: {},
       zoneCashArrangementFeeStepAmount: {},
       zoneCashArrangementFeeMarginPercent: {},
     },
@@ -191,6 +198,9 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
       zoneLeadDays: Object.fromEntries(
         (initial.zoneLeadDays ?? []).map((zl) => [zl.zoneId, zl.deliveryLeadDays ?? null])
       ),
+      hiddenZones: Object.fromEntries(
+        (initial.zoneLeadDays ?? []).filter((zl) => zl.hidden).map((zl) => [zl.zoneId, true])
+      ),
       zoneCashArrangementFeeStepAmount: Object.fromEntries(
         (initial.zoneLeadDays ?? []).map((zl) => [zl.zoneId, zl.cashArrangementFeeStepAmount ?? null])
       ),
@@ -253,6 +263,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
       zoneLeadDays: (() => {
         const zoneIds = new Set([
           ...Object.keys(values.zoneLeadDays ?? {}),
+          ...Object.keys(values.hiddenZones ?? {}),
           ...Object.keys(values.zoneCashArrangementFeeStepAmount ?? {}),
           ...Object.keys(values.zoneCashArrangementFeeMarginPercent ?? {}),
         ]);
@@ -261,7 +272,14 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
           const deliveryLeadDays = values.zoneLeadDays?.[zoneId] ?? null;
           const cashArrangementFeeStepAmount = values.zoneCashArrangementFeeStepAmount?.[zoneId] ?? null;
           const cashArrangementFeeMarginPercent = values.zoneCashArrangementFeeMarginPercent?.[zoneId] ?? null;
-          if (deliveryLeadDays == null && cashArrangementFeeStepAmount == null && cashArrangementFeeMarginPercent == null) {
+          // A hide with no lead/fee override still needs its row written.
+          const hidden = values.hiddenZones?.[zoneId] === true;
+          if (
+            deliveryLeadDays == null &&
+            cashArrangementFeeStepAmount == null &&
+            cashArrangementFeeMarginPercent == null &&
+            !hidden
+          ) {
             continue;
           }
           rows.push({
@@ -269,6 +287,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
             deliveryLeadDays: deliveryLeadDays == null ? null : Number(deliveryLeadDays),
             cashArrangementFeeStepAmount,
             cashArrangementFeeMarginPercent,
+            hidden,
           });
         }
         return rows;
@@ -527,8 +546,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
           </div>
         </section>
 
-        <section className="rounded-2xl border border-ink-100 bg-white p-5 sm:p-6">
-          <h3 className="mb-4 font-display text-lg text-ink-900">Regions</h3>
+        <FormSection title="Regions">
           <Controller
             control={control}
             name="regionIds"
@@ -536,16 +554,67 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
               <RegionPicker selectedIds={field.value} onChange={field.onChange} />
             )}
           />
-        </section>
+        </FormSection>
+
+        {/* Zone visibility sits directly under Regions: it narrows the same
+            "where is this sold" decision from region down to individual zones.
+            Collapsed by default so the panel stays small until it's needed. */}
+        {selectedRegions.length > 0 && (
+          <FormSection
+            title={t("admin.categoryForm.zoneVisibilityHeading")}
+            description={t("admin.categoryForm.zoneVisibilityHint")}
+            collapsible
+          >
+            <div className="flex flex-col gap-4">
+              {selectedRegions.map((region) => {
+                const regionZones = allZones.filter((z) => z.regionId === region.id);
+                return (
+                  <div
+                    key={region.id}
+                    className="border-t border-ink-100 pt-4 first:border-t-0 first:pt-0"
+                  >
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-ink-700">
+                      {region.name}
+                    </p>
+                    {regionZones.length === 0 ? (
+                      <p className="text-xs text-ink-400">
+                        {t("admin.categoryForm.zoneNoZonesNote")}
+                      </p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {regionZones.map((zone) => (
+                          <Controller
+                            key={zone.id}
+                            control={control}
+                            name={`hiddenZones.${zone.id}`}
+                            render={({ field }) => (
+                              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 transition-colors hover:bg-cream-50">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-bloom-600"
+                                  checked={field.value === true}
+                                  onChange={(e) => field.onChange(e.target.checked)}
+                                />
+                                <span className="text-sm text-ink-800">{zone.name}</span>
+                              </label>
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </FormSection>
+        )}
 
         {selectedRegions.length > 0 && (
-          <section className="rounded-2xl border border-ink-100 bg-white p-5 sm:p-6">
-            <h3 className="mb-1 font-display text-lg text-ink-900">
-              {t("admin.categoryForm.regionLeadDaysHeading")}
-            </h3>
-            <p className="mb-3 text-xs text-ink-500">
-              {t("admin.categoryForm.regionLeadDaysHint")}
-            </p>
+          <FormSection
+            title={t("admin.categoryForm.regionLeadDaysHeading")}
+            description={t("admin.categoryForm.regionLeadDaysHint")}
+            collapsible
+          >
             <div className="flex flex-col gap-4">
               {selectedRegions.map((region) => {
                 const regionZones = allZones.filter((z) => z.regionId === region.id);
@@ -699,7 +768,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
                 );
               })}
             </div>
-          </section>
+          </FormSection>
         )}
 
         <section className="rounded-2xl border border-ink-100 bg-white p-5 sm:p-6">

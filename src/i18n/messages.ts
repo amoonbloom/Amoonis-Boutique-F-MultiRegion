@@ -1006,6 +1006,9 @@ export const messages = {
         zoneLeadDaysHint:
           "Optional: override the delivery days for a specific zone. Blank = use the region/category value above.",
         zoneNoZonesNote: "No delivery zones for this region.",
+        zoneVisibilityHeading: "Hide in zones",
+        zoneVisibilityHint:
+          "Tick a zone to hide this from the storefront there. Customers delivering to that zone won't see it, and checkout will refuse the order.",
         zoneCashArrangementFeeStepAmountLabel: "{zone} — fee step",
         zoneCashArrangementFeeMarginPercentLabel: "{zone} — fee margin (%)",
       },
@@ -1155,6 +1158,9 @@ export const messages = {
         zoneLeadDaysHint:
           "Optional: override the delivery days for a specific zone. Blank = use the region/product value.",
         zoneNoZonesNote: "No delivery zones for this region.",
+        zoneVisibilityHeading: "Hide in zones",
+        zoneVisibilityHint:
+          "Tick a zone to hide this from the storefront there. Customers delivering to that zone won't see it, and checkout will refuse the order.",
         zoneCashArrangementFeeStepAmountLabel: "{zone} — fee step",
         zoneCashArrangementFeeMarginPercentLabel: "{zone} — fee margin (%)",
         stockLabel: "Stock",
@@ -3059,6 +3065,9 @@ export const messages = {
         zoneLeadDaysHint:
           "اختياري: تجاوز أيام التوصيل لمنطقة فرعية محددة. اتركه فارغًا لاستخدام قيمة المنطقة/الفئة أعلاه.",
         zoneNoZonesNote: "لا توجد مناطق فرعية لهذه المنطقة.",
+        zoneVisibilityHeading: "إخفاء في مناطق فرعية",
+        zoneVisibilityHint:
+          "حدّد منطقة فرعية لإخفاء هذا العنصر من المتجر فيها. لن يراه العملاء الذين يطلبون التوصيل إلى تلك المنطقة، وسيرفض الدفع الطلب.",
         zoneCashArrangementFeeStepAmountLabel: "{zone} — خطوة الرسوم",
         zoneCashArrangementFeeMarginPercentLabel: "{zone} — هامش الرسوم (%)",
       },
@@ -3206,6 +3215,9 @@ export const messages = {
         zoneLeadDaysHint:
           "اختياري: تجاوز أيام التوصيل لمنطقة فرعية محددة. اتركه فارغا لاستخدام قيمة المنطقة/المنتج.",
         zoneNoZonesNote: "لا توجد مناطق فرعية لهذه المنطقة.",
+        zoneVisibilityHeading: "إخفاء في مناطق فرعية",
+        zoneVisibilityHint:
+          "حدّد منطقة فرعية لإخفاء هذا العنصر من المتجر فيها. لن يراه العملاء الذين يطلبون التوصيل إلى تلك المنطقة، وسيرفض الدفع الطلب.",
         zoneCashArrangementFeeStepAmountLabel: "{zone} — خطوة الرسوم",
         zoneCashArrangementFeeMarginPercentLabel: "{zone} — هامش الرسوم (%)",
         regionDiscountedPriceHint: "اتركه فارغا لعدم وجود خصم في هذه المنطقة",
