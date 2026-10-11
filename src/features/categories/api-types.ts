@@ -71,6 +71,11 @@ export interface ApiCategoryZoneLead {
   deliveryLeadDays: number | null;
   cashArrangementFeeStepAmount?: number | null;
   cashArrangementFeeMarginPercent?: number | null;
+  /** ZONE VISIBILITY: true hides this category from the storefront in this zone
+   *  (listing, search, category pages and its own page), and checkout refuses an
+   *  order delivering there. Absent/false on every pre-existing row — these zone
+   *  entries originally only carried lead-time / fee overrides. */
+  hidden?: boolean;
 }
 
 export interface ApiCategoryDetail extends ApiCategory {

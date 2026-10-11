@@ -6,7 +6,7 @@ import { ProductGrid } from "@/features/products/components/ProductGrid";
 import { getCachedProductList } from "@/services/catalogCache";
 import { toUiProducts } from "@/features/products/adapters";
 import { ROUTES } from "@/constants/routes";
-import { getServerRegion } from "@/services/serverRegion";
+import { getServerRegion, getServerZoneName } from "@/services/serverRegion";
 import { getServerLocale } from "@/i18n/server";
 import { t } from "@/i18n";
 
@@ -21,7 +21,8 @@ export async function FeaturedProducts() {
     getServerRegion(),
     getServerLocale(),
   ]);
-  const page = await getCachedProductList(region, 1, 4).catch(() => ({
+  const zone = await getServerZoneName();
+  const page = await getCachedProductList(region, 1, 4, zone).catch(() => ({
     data: [],
     meta: {},
   }));

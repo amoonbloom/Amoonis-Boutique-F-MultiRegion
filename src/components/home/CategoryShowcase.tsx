@@ -9,7 +9,7 @@ import {
 } from "@/services/catalogCache";
 import { toUiCategories } from "@/features/categories/adapters";
 import { ROUTES } from "@/constants/routes";
-import { getServerRegion } from "@/services/serverRegion";
+import { getServerRegion, getServerZoneName } from "@/services/serverRegion";
 import { getServerLocale } from "@/i18n/server";
 import { t } from "@/i18n";
 import { regionCopyFromRegionCode } from "@/features/location/regionCopy";
@@ -19,7 +19,8 @@ export async function CategoryShowcase() {
     getServerRegion(),
     getServerLocale(),
   ]);
-  const apiCategories = await getCachedCategories(region).catch(() => []);
+  const zone = await getServerZoneName();
+  const apiCategories = await getCachedCategories(region, zone).catch(() => []);
   const featured = toUiCategories(apiCategories, locale).slice(0, 4);
   const regionCopy = await regionCopyFromRegionCode(region, locale);
 

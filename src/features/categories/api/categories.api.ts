@@ -8,9 +8,17 @@ import type {
 } from "../api-types";
 
 export const categoriesApi = {
-  async list(region?: string): Promise<ApiCategory[]> {
+  // `zone` is the selected delivery-zone NAME. Server components have no cookies on
+  // the outgoing request, so the zone travels as a query param there, exactly like
+  // `region` does; browser calls get it automatically as an X-Zone header instead.
+  // Needed so zone-hidden categories don't leak into server-rendered surfaces (home
+  // page grid, shop sidebar).
+  async list(region?: string, zone?: string): Promise<ApiCategory[]> {
+    const params: Record<string, string> = {};
+    if (region) params.region = region;
+    if (zone) params.zone = zone;
     const { data } = await http.get<PaginatedResponse<ApiCategory>>("/categories", {
-      params: region ? { region } : undefined,
+      params: Object.keys(params).length ? params : undefined,
     });
     return data.data;
   },

@@ -5,7 +5,7 @@ import {
   getCachedProductList,
 } from "@/services/catalogCache";
 import { toUiProducts } from "@/features/products/adapters";
-import { getServerRegion } from "@/services/serverRegion";
+import { getServerRegion, getServerZoneName } from "@/services/serverRegion";
 import { getServerLocale } from "@/i18n/server";
 import { BEST_SELLING_FILTER_VALUE } from "@/features/products/facets";
 import { ROUTES } from "@/constants/routes";
@@ -21,14 +21,15 @@ export async function BestSellers() {
     getServerLocale(),
   ]);
 
-  const cats = await getCachedCategories(region).catch(() => []);
+  const zone = await getServerZoneName();
+  const cats = await getCachedCategories(region, zone).catch(() => []);
   const giftBoxes = cats.find((c) =>
     /gift\s*box/i.test(c.title ?? "")
   );
 
   const page = await (giftBoxes
     ? getCachedProductsByCategory(region, giftBoxes.id, 8)
-    : getCachedProductList(region, 1, 8)
+    : getCachedProductList(region, 1, 8, zone)
   ).catch(() => ({ data: [], meta: {} }));
 
   const products = toUiProducts(page.data, { locale }).slice(0, 8);

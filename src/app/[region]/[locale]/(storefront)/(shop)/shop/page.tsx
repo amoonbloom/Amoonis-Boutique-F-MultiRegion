@@ -60,16 +60,16 @@ export default async function ShopPage(props: PageProps<"/[region]/[locale]/shop
     // Search results vary per query and are inherently uncacheable; the plain
     // catalog listing goes through the region-cached data layer.
     (q
-      ? productsApi.search(q, { page: 1, limit: PAGE_SIZE, region })
-      : getCachedProductList(region, 1, PAGE_SIZE)
+      ? productsApi.search(q, { page: 1, limit: PAGE_SIZE, region, zone: zoneName })
+      : getCachedProductList(region, 1, PAGE_SIZE, zoneName)
     ).catch(() => ({ data: [], meta: {} })),
-    getCachedCategories(region).catch(() => []),
-    getCachedSections(region).catch(() => []),
+    getCachedCategories(region, zoneName).catch(() => []),
+    getCachedSections(region, zoneName).catch(() => []),
     // Full catalogue (region max page) used ONLY to seed the "Everything" count with the
     // BROWSABLE total (published, in-region, NOT coming-soon), so first paint already shows
     // the number the grid + visible category counts add up to — not the raw total that also
     // counts coming-soon products hidden from the grid. Skipped during search.
-    q ? Promise.resolve(null) : getCachedProductList(region, 1, 100).catch(() => null),
+    q ? Promise.resolve(null) : getCachedProductList(region, 1, 100, zoneName).catch(() => null),
   ]);
 
   const categories = toUiCategories(apiCategories, locale);

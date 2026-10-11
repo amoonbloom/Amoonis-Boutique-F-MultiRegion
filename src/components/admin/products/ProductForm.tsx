@@ -22,6 +22,7 @@ import { Button, Input } from "@/components/ui";
 import { RichTextEditor } from "@/components/admin/regions/RichTextEditor";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 import { RegionPicker } from "@/components/admin/RegionPicker";
+import { FormSection as Card } from "@/components/admin/FormSection";
 import { Select } from "@/components/admin/Select";
 import { SortableList, SortableItem } from "@/components/admin/Sortable";
 import {
@@ -247,6 +248,14 @@ function useProductFormSchema() {
           .max(30, t("admin.productForm.deliveryLeadDaysInvalid"))
           .nullish()
       ),
+      // Per-zone VISIBILITY. zoneId -> true means "hide this product in that zone".
+      // A separate record (not folded into zoneLeadDays' number shape) for the same
+      // reason the fee records are separate; merged into one array at submit time.
+      // Tolerant on purpose: react-hook-form leaves a key behind when a checkbox is
+      // cleared, and a strict z.boolean() would reject that `undefined` — failing the
+      // WHOLE form. handleSubmit() has no onInvalid handler, so that surfaced as a
+      // "Save changes" button that silently did nothing.
+      hiddenZones: z.record(z.string(), z.boolean().optional()).optional(),
       // Per-zone cash-arrangement fee schedule overrides — kept as sibling records (not
       // merged into zoneLeadDays' bare-number shape) so the existing lead-days state
       // stays untouched; merged back into one combined array at submit time.
@@ -310,6 +319,7 @@ const emptyDefaults: ProductFormValues = {
   discountedPrice: null,
   regionPrices: {},
   zoneLeadDays: {},
+  hiddenZones: {},
   zoneCashArrangementFeeStepAmount: {},
   zoneCashArrangementFeeMarginPercent: {},
   giftCardEnabled: false,
@@ -420,6 +430,11 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
       ),
       zoneLeadDays: Object.fromEntries(
         (initial.zoneLeadDays ?? []).map((zl) => [zl.zoneId, zl.deliveryLeadDays ?? null])
+      ),
+      hiddenZones: Object.fromEntries(
+        (initial.zoneLeadDays ?? [])
+          .filter((zl) => zl.hidden)
+          .map((zl) => [zl.zoneId, true])
       ),
       zoneCashArrangementFeeStepAmount: Object.fromEntries(
         (initial.zoneLeadDays ?? []).map((zl) => [zl.zoneId, zl.cashArrangementFeeStepAmount ?? null])
@@ -643,6 +658,7 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
       zoneLeadDays: (() => {
         const zoneIds = new Set([
           ...Object.keys(values.zoneLeadDays ?? {}),
+          ...Object.keys(values.hiddenZones ?? {}),
           ...Object.keys(values.zoneCashArrangementFeeStepAmount ?? {}),
           ...Object.keys(values.zoneCashArrangementFeeMarginPercent ?? {}),
         ]);
@@ -652,7 +668,16 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
           const cashArrangementFeeStepAmount = values.zoneCashArrangementFeeStepAmount?.[zoneId] ?? null;
           const cashArrangementFeeMarginPercent =
             values.zoneCashArrangementFeeMarginPercent?.[zoneId] ?? null;
-          if (deliveryLeadDays == null && cashArrangementFeeStepAmount == null && cashArrangementFeeMarginPercent == null) {
+          // `hidden` alone is reason enough to send a row — visibility lives on the
+          // same join table, so a zone that is only hidden (no lead/fee override)
+          // must still be written or the hide is silently dropped.
+          const hidden = values.hiddenZones?.[zoneId] === true;
+          if (
+            deliveryLeadDays == null &&
+            cashArrangementFeeStepAmount == null &&
+            cashArrangementFeeMarginPercent == null &&
+            !hidden
+          ) {
             continue;
           }
           rows.push({
@@ -660,6 +685,7 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
             deliveryLeadDays: deliveryLeadDays == null ? null : Number(deliveryLeadDays),
             cashArrangementFeeStepAmount,
             cashArrangementFeeMarginPercent,
+            hidden,
           });
         }
         return rows;
@@ -1338,6 +1364,59 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
           />
         </Card>
 
+        {/* Zone visibility sits directly under Regions: it narrows the same
+            "where is this sold" decision from region down to individual zones. */}
+        {selectedRegions.length > 0 ? (
+          <Card
+            title={t("admin.productForm.zoneVisibilityHeading")}
+            description={t("admin.productForm.zoneVisibilityHint")}
+            collapsible
+          >
+            <div className="flex flex-col gap-4">
+              {selectedRegions.map((region) => {
+                const regionZones = allZones.filter((z) => z.regionId === region.id);
+                return (
+                  <div
+                    key={region.id}
+                    className="border-t border-ink-100 pt-4 first:border-t-0 first:pt-0"
+                  >
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-ink-700">
+                      {region.name}
+                    </p>
+                    {regionZones.length === 0 ? (
+                      <p className="text-xs text-ink-400">
+                        {t("admin.productForm.zoneNoZonesNote")}
+                      </p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {regionZones.map((zone) => (
+                          <Controller
+                            key={zone.id}
+                            control={control}
+                            name={`hiddenZones.${zone.id}`}
+                            render={({ field }) => (
+                              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 transition-colors hover:bg-cream-50">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-bloom-600"
+                                  checked={field.value === true}
+                                  // Always a real boolean — never undefined (see schema).
+                                  onChange={(e) => field.onChange(e.target.checked)}
+                                />
+                                <span className="text-sm text-ink-800">{zone.name}</span>
+                              </label>
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        ) : null}
+
         {status === "PUBLISHED" && (
           <Card
             title={t("admin.productForm.comingSoonHeading")}
@@ -1549,56 +1628,6 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
         </Button>
       </div>
     </form>
-  );
-}
-
-interface CardProps {
-  title: string;
-  description?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  /** When set, the header becomes a toggle that shows/hides the body — starts
-   *  closed unless defaultOpen is true. Omit for a normal always-open card. */
-  collapsible?: boolean;
-  defaultOpen?: boolean;
-}
-
-function Card({ title, description, action, children, collapsible, defaultOpen }: CardProps) {
-  const [open, setOpen] = useState(defaultOpen ?? false);
-  const showBody = !collapsible || open;
-  return (
-    <section className="rounded-2xl border border-ink-100 bg-white p-5 sm:p-6">
-      <header className={cn("flex items-start justify-between gap-3", showBody && "mb-4")}>
-        {collapsible ? (
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-expanded={open}
-            className="flex flex-1 items-start justify-between gap-3 text-left"
-          >
-            <div>
-              <h3 className="font-display text-lg text-ink-900">{title}</h3>
-              {description ? (
-                <p className="text-xs text-ink-500">{description}</p>
-              ) : null}
-            </div>
-            <ChevronDown
-              size={16}
-              className={cn("mt-1 shrink-0 text-ink-500 transition-transform", open && "rotate-180")}
-            />
-          </button>
-        ) : (
-          <div>
-            <h3 className="font-display text-lg text-ink-900">{title}</h3>
-            {description ? (
-              <p className="text-xs text-ink-500">{description}</p>
-            ) : null}
-          </div>
-        )}
-        {action}
-      </header>
-      {showBody ? children : null}
-    </section>
   );
 }
 

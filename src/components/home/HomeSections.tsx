@@ -8,7 +8,7 @@ import { ProductRail } from "./ProductRail";
 import { getCachedSections, getCachedProductList } from "@/services/catalogCache";
 import { toUiProducts } from "@/features/products/adapters";
 import { ROUTES } from "@/constants/routes";
-import { getServerRegion } from "@/services/serverRegion";
+import { getServerRegion, getServerZoneName } from "@/services/serverRegion";
 import { getServerLocale } from "@/i18n/server";
 import { localized, t } from "@/i18n";
 import { sectionFilterValue } from "@/features/products/facets";
@@ -41,14 +41,15 @@ export async function HomeSections() {
     getServerRegion(),
     getServerLocale(),
   ]);
-  const apiSections = await getCachedSections(region).catch(() => []);
+  const zone = await getServerZoneName();
+  const apiSections = await getCachedSections(region, zone).catch(() => []);
   const eligible = [...apiSections]
     .filter((s) => s.products && s.products.length > 0)
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .slice(0, MAX_SECTIONS);
 
   if (eligible.length === 0) {
-    const page = await getCachedProductList(region, 1, 12).catch(() => ({
+    const page = await getCachedProductList(region, 1, 12, zone).catch(() => ({
       data: [],
       meta: {},
     }));

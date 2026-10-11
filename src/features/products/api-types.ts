@@ -133,6 +133,11 @@ export interface ApiProductZoneLead {
   deliveryLeadDays: number | null;
   cashArrangementFeeStepAmount?: number | null;
   cashArrangementFeeMarginPercent?: number | null;
+  /** ZONE VISIBILITY: true hides this product from the storefront in this zone
+   *  (listing, search, category pages and its own page), and checkout refuses an
+   *  order delivering there. Absent/false on every pre-existing row — these zone
+   *  entries originally only carried lead-time / fee overrides. */
+  hidden?: boolean;
 }
 
 export interface ApiProduct {
@@ -306,6 +311,9 @@ export interface ApiProductCreateInput {
 export type ApiProductUpdateInput = Partial<ApiProductCreateInput>;
 
 export interface ApiProductListParams {
+  /** Selected delivery-zone NAME — hides zone-hidden products. Server-side only;
+   *  browser calls send it as an X-Zone header instead. */
+  zone?: string;
   page?: number;
   limit?: number;
   /**

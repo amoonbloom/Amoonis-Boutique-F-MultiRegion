@@ -123,6 +123,17 @@ function createHttpClient(): AxiosInstance {
       if (region && !config.headers["X-Region"]) {
         config.headers["X-Region"] = region;
       }
+      // Selected delivery zone, sent the same way as the region so every catalog
+      // read is zone-aware without threading a zone through each call site. The
+      // cookie holds the zone NAME (that's what `location.city` is); the backend
+      // resolves it to an id within the active region. Absent until the customer
+      // picks a city — in which case nothing is zone-filtered and they see the
+      // full catalog, with checkout as the authoritative availability gate.
+      const zoneMatch = document.cookie.match(/(?:^|;\s*)zone=([^;]+)/);
+      const zone = zoneMatch ? decodeURIComponent(zoneMatch[1]) : null;
+      if (zone && !config.headers["X-Zone"]) {
+        config.headers["X-Zone"] = zone;
+      }
     }
     // Server-side only: identify as the trusted first-party renderer so the
     // backend's per-IP public rate limit doesn't throttle SSR/ISR — every
