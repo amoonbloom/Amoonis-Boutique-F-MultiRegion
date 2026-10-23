@@ -297,7 +297,7 @@ function useProductFormSchema() {
       saleLabel: z.string().optional(),
       saleLabel_ar: z.string().optional(),
       regionIds: z.array(z.string()),
-      images: z.array(z.string().url()).max(10, t("admin.productForm.imagesMax")),
+      images: z.array(z.string().url()).max(20, t("admin.productForm.imagesMax")),
       descriptions: z.array(descriptionSchema),
       productOptions: z.array(optionSchema),
     });
@@ -1662,7 +1662,7 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
             </SortableList>
           ) : null}
 
-          {(images?.length ?? 0) < 10 ? (
+          {(images?.length ?? 0) < 20 ? (
             <Controller
               control={control}
               name="images"
@@ -1677,9 +1677,9 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
                     if (url) field.onChange([...(field.value ?? []), url]);
                   }}
                   onUploadMany={(urls) => {
-                    // Append up to the 10-image cap, in the order chosen.
+                    // Append up to the 20-image cap, in the order chosen.
                     const current = field.value ?? [];
-                    field.onChange([...current, ...urls].slice(0, 10));
+                    field.onChange([...current, ...urls].slice(0, 20));
                   }}
                 />
               )}
