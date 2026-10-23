@@ -117,7 +117,9 @@ export function OrderInvoiceDocument({
   const paymentLabel =
     order.paymentMethod === "COD"
       ? t(locale, "admin.orderDetailPage.codLabel")
-      : t(locale, "checkout.payOnline");
+      : order.paymentMethod === "TABBY"
+        ? t(locale, "checkout.payTabby")
+        : t(locale, "checkout.payCard");
   const statusLabel = t(locale, ORDER_STATUS_LABEL_KEY[order.status]);
   const paymentStatusLabel = t(locale, PAYMENT_STATUS_LABEL_KEY[order.paymentStatus]);
 

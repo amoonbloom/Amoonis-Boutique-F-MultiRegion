@@ -429,29 +429,34 @@ export function CheckoutClient() {
   const belowMinOrder = minOrderAmount != null && subtotal < minOrderAmount;
   const aboveMaxOrder = maxOrderAmount != null && subtotal > maxOrderAmount;
 
-  // Online payment (MyFatoorah). Offered — to signed-in customers AND guests — in a region
-  // that has it enabled with at least one method. The redirect flow shows Apple Pay (on
-  // iPhone/Safari) + cards on MyFatoorah's page. Guests pay via the public guest-pay endpoint.
-  const onlinePayAvailable =
+  // MyFatoorah (card / Apple Pay) — region onlinePaymentEnabled + at least one method.
+  const myFatoorahAvailable =
     Boolean(currentRegion?.onlinePaymentEnabled) &&
     (Boolean(currentRegion?.applePayEnabled) || Boolean(currentRegion?.cardPaymentEnabled));
-  const [paymentMethod, setPaymentMethod] = useState<"COD" | "MYFATOORAH">("COD");
-  // Effective method: fall back to COD whenever online isn't available, so a stale
-  // "MYFATOORAH" selection (e.g. after switching to a region without it) can't leak through.
-  const payingOnline = onlinePayAvailable && paymentMethod === "MYFATOORAH";
+  // Tabby Pay-in-4 — independent region toggle (does not require MyFatoorah online payment).
+  const tabbyAvailable = Boolean(currentRegion?.tabbyEnabled);
+  // Any redirect-based online method (legacy name kept for prop wiring below).
+  const onlinePayAvailable = myFatoorahAvailable || tabbyAvailable;
+  const [paymentMethod, setPaymentMethod] = useState<"COD" | "MYFATOORAH" | "TABBY">("COD");
+  const payingOnline =
+    (paymentMethod === "MYFATOORAH" && myFatoorahAvailable) ||
+    (paymentMethod === "TABBY" && tabbyAvailable);
 
   // COD unavailability only blocks a COD order — an online payment is unaffected by it.
   const placeOrderBlocked =
     (!payingOnline && codUnavailable) || belowMinOrder || aboveMaxOrder;
 
-  // Keep the selected method valid as region / COD availability changes: force COD when
-  // online isn't available, and auto-pick online when COD is the only thing turned off
-  // (so the customer is never stuck with an unselectable, blocked order).
+  // Keep the selected method valid as region / COD availability changes.
   useEffect(() => {
-    if (!onlinePayAvailable && paymentMethod !== "COD") setPaymentMethod("COD");
-    else if (onlinePayAvailable && codUnavailable && paymentMethod === "COD")
-      setPaymentMethod("MYFATOORAH");
-  }, [onlinePayAvailable, codUnavailable, paymentMethod]);
+    if (paymentMethod === "MYFATOORAH" && !myFatoorahAvailable) {
+      setPaymentMethod(tabbyAvailable ? "TABBY" : "COD");
+    } else if (paymentMethod === "TABBY" && !tabbyAvailable) {
+      setPaymentMethod(myFatoorahAvailable ? "MYFATOORAH" : "COD");
+    } else if (paymentMethod === "COD" && codUnavailable) {
+      if (myFatoorahAvailable) setPaymentMethod("MYFATOORAH");
+      else if (tabbyAvailable) setPaymentMethod("TABBY");
+    }
+  }, [myFatoorahAvailable, tabbyAvailable, codUnavailable, paymentMethod]);
 
   // VAT preview for the current region. The public endpoint intentionally omits the
   // SPECIFIC_PRODUCTS/SPECIFIC_CATEGORIES scope lists (that's catalog-scoping data, not
@@ -684,11 +689,10 @@ export function CheckoutClient() {
           promoCode: promoResult ? promoCode.trim() : undefined,
           deliveryType,
           scheduledDeliveryAt: scheduledDeliveryAtIso,
-          paymentMethod: payingOnline ? "MYFATOORAH" : "COD",
+          paymentMethod: payingOnline ? paymentMethod : "COD",
         });
-        // Online guest order: get the MyFatoorah hosted-page URL via the public guest-pay
-        // endpoint; onSuccess hands the browser off to it. The return URL carries ?guest=1 so
-        // the browser comes back to the guest success page after paying.
+        // Online guest order: get the hosted payment URL via guest-pay; onSuccess redirects.
+        // Return URL carries ?guest=1 so the browser comes back to the guest success page.
         if (payingOnline) {
           const returnUrl = `${window.location.origin}${localize(ROUTES.orderSuccess)}?guest=1`;
           const { paymentUrl } = await ordersApi.guestPay(guestOrder.id, { returnUrl });
@@ -704,18 +708,17 @@ export function CheckoutClient() {
         addressId: resolvedAddressId,
         shippingAddress,
         shortAddress: normalizedShortAddress,
-        paymentMethod: payingOnline ? "MYFATOORAH" : "COD",
+        paymentMethod: payingOnline ? paymentMethod : "COD",
         promoCode: promoResult ? promoCode.trim() : undefined,
         deliveryType,
         scheduledDeliveryAt: scheduledDeliveryAtIso,
       });
 
       // Online: the order is PENDING_PAYMENT and the cart is kept until payment lands.
-      // Fetch the MyFatoorah hosted-page URL so onSuccess can hand the browser off to it.
+      // Fetch the gateway hosted-page URL (MyFatoorah or Tabby) so onSuccess can redirect.
       if (payingOnline) {
         // Tell the backend where to send the browser back after paying: this region+locale's
-        // order-success page (absolute URL). On failure MyFatoorah/our callback swaps it to
-        // the matching order-error page. Without this the return lands on a bare backend page.
+        // order-success page (absolute URL). On failure the callback swaps it to order-error.
         const returnUrl = `${window.location.origin}${localize(ROUTES.orderSuccess)}`;
         const { paymentUrl } = await ordersApi.pay(order.id, { returnUrl });
         return { order, paymentUrl };
@@ -905,6 +908,8 @@ export function CheckoutClient() {
             deliveryConfig={deliveryConfig}
             codUnavailable={codUnavailable}
             onlinePayAvailable={onlinePayAvailable}
+            myFatoorahAvailable={myFatoorahAvailable}
+            tabbyAvailable={tabbyAvailable}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
             belowMinOrder={belowMinOrder}
@@ -1428,10 +1433,12 @@ interface OrderReviewCardProps {
   /** Resolved delivery config for the active area (undefined while loading). */
   deliveryConfig: ResolvedDeliveryConfig | undefined;
   codUnavailable: boolean;
-  /** Online payment (MyFatoorah) offered for this region + signed-in customer. */
+  /** Any redirect online method (MyFatoorah and/or Tabby) offered for this region. */
   onlinePayAvailable: boolean;
-  paymentMethod: "COD" | "MYFATOORAH";
-  onPaymentMethodChange: (v: "COD" | "MYFATOORAH") => void;
+  myFatoorahAvailable: boolean;
+  tabbyAvailable: boolean;
+  paymentMethod: "COD" | "MYFATOORAH" | "TABBY";
+  onPaymentMethodChange: (v: "COD" | "MYFATOORAH" | "TABBY") => void;
   belowMinOrder: boolean;
   aboveMaxOrder: boolean;
   minOrderAmount: number | null;
@@ -1472,6 +1479,8 @@ function OrderReviewCard({
   deliveryConfig,
   codUnavailable,
   onlinePayAvailable,
+  myFatoorahAvailable,
+  tabbyAvailable,
   paymentMethod,
   onPaymentMethodChange,
   belowMinOrder,
@@ -1835,30 +1844,89 @@ function OrderReviewCard({
 
         <Divider />
 
-        {/* Payment method. When online payment (MyFatoorah) is available for this region +
-            signed-in customer, offer a choice; otherwise fall back to the COD-only display
-            (or the "COD unavailable" notice when the resolved area disables COD). */}
+        {/* Payment: Online (MyFatoorah and/or Tabby as sub-options) vs COD. */}
         {onlinePayAvailable ? (
           <div className="flex flex-col gap-3">
-            <label
+            <div
               className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition",
-                paymentMethod === "MYFATOORAH"
+                "rounded-2xl border transition",
+                paymentMethod === "MYFATOORAH" || paymentMethod === "TABBY"
                   ? "border-ink-900 bg-cream-50"
                   : "border-ink-200 bg-white"
               )}
             >
-              <input
-                type="radio"
-                name="payment"
-                className="mt-1 h-4 w-4 accent-ink-900"
-                checked={paymentMethod === "MYFATOORAH"}
-                onChange={() => onPaymentMethodChange("MYFATOORAH")}
-              />
-              <div>
-                <p className="font-medium text-ink-900">{t("checkout.payOnline")}</p>
-              </div>
-            </label>
+              <label className="flex cursor-pointer items-start gap-3 p-4">
+                <input
+                  type="radio"
+                  name="payment"
+                  className="mt-1 h-4 w-4 accent-ink-900"
+                  checked={paymentMethod === "MYFATOORAH" || paymentMethod === "TABBY"}
+                  onChange={() =>
+                    onPaymentMethodChange(
+                      myFatoorahAvailable
+                        ? "MYFATOORAH"
+                        : "TABBY"
+                    )
+                  }
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-ink-900">{t("checkout.payOnline")}</p>
+                  <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payOnlineHint")}</p>
+                </div>
+              </label>
+
+              {/* Nested providers — only while Online payment is selected. */}
+              {(paymentMethod === "MYFATOORAH" || paymentMethod === "TABBY") &&
+              (myFatoorahAvailable || tabbyAvailable) ? (
+                <div className="ms-8 me-4 mb-4 flex flex-col gap-2 border-s-2 border-ink-100 ps-4">
+                  {myFatoorahAvailable ? (
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition",
+                        paymentMethod === "MYFATOORAH"
+                          ? "border-ink-900 bg-white"
+                          : "border-ink-200 bg-white/70"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="online-provider"
+                        className="mt-1 h-4 w-4 accent-ink-900"
+                        checked={paymentMethod === "MYFATOORAH"}
+                        onChange={() => onPaymentMethodChange("MYFATOORAH")}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-ink-900">{t("checkout.payCard")}</p>
+                        <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payCardHint")}</p>
+                      </div>
+                    </label>
+                  ) : null}
+
+                  {tabbyAvailable ? (
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition",
+                        paymentMethod === "TABBY"
+                          ? "border-ink-900 bg-white"
+                          : "border-ink-200 bg-white/70"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="online-provider"
+                        className="mt-1 h-4 w-4 accent-ink-900"
+                        checked={paymentMethod === "TABBY"}
+                        onChange={() => onPaymentMethodChange("TABBY")}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-ink-900">{t("checkout.payTabby")}</p>
+                        <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payTabbyHint")}</p>
+                      </div>
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
 
             {!codUnavailable ? (
               <label

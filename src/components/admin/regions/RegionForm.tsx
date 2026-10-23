@@ -103,6 +103,7 @@ export function RegionForm({
       onlinePaymentEnabled: z.boolean(),
       applePayEnabled: z.boolean(),
       cardPaymentEnabled: z.boolean(),
+      tabbyEnabled: z.boolean(),
       blackoutDates: z.array(
         z.object({
           id: z.string().optional(),
@@ -184,6 +185,7 @@ export function RegionForm({
       onlinePaymentEnabled: false,
       applePayEnabled: true,
       cardPaymentEnabled: true,
+      tabbyEnabled: false,
       blackoutDates: [],
       iso2: "",
       urlSlug: "",
@@ -267,6 +269,7 @@ export function RegionForm({
       onlinePaymentEnabled: initial.onlinePaymentEnabled ?? false,
       applePayEnabled: initial.applePayEnabled ?? true,
       cardPaymentEnabled: initial.cardPaymentEnabled ?? true,
+      tabbyEnabled: initial.tabbyEnabled ?? false,
       blackoutDates: (initial.blackoutDates ?? []).map((b) => ({
         id: b.id,
         date: b.date,
@@ -313,6 +316,7 @@ export function RegionForm({
       onlinePaymentEnabled: v.onlinePaymentEnabled,
       applePayEnabled: v.applePayEnabled,
       cardPaymentEnabled: v.cardPaymentEnabled,
+      tabbyEnabled: v.tabbyEnabled,
       blackoutDates: (v.blackoutDates ?? [])
         .filter((b) => b.date?.trim())
         .map((b) => ({
@@ -574,6 +578,15 @@ export function RegionForm({
                 </label>
                 <p className="mt-1 text-xs text-ink-500">{t("admin.regionForm.cardPaymentEnabledHint")}</p>
               </div>
+              <label className="mt-4 flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  {...register("tabbyEnabled")}
+                  className="h-5 w-5 accent-bloom-600"
+                />
+                <span className="text-sm text-ink-900">{t("admin.regionForm.tabbyEnabledLabel")}</span>
+              </label>
+              <p className="mt-1 text-xs text-ink-500">{t("admin.regionForm.tabbyEnabledHint")}</p>
             </div>
             <Input
               label={t("admin.regionForm.sameDayCutoffLabel")}
