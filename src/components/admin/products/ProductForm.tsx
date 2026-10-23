@@ -232,6 +232,10 @@ function useProductFormSchema() {
           // untouched override (undefined) is accepted the same as an explicit null.
           cashArrangementFeeStepAmount: z.number().positive().nullish(),
           cashArrangementFeeMarginPercent: z.number().nonnegative().nullish(),
+          // Per-region gift-option price overrides. Null/blank = use the product's
+          // global giftCardExtraPrice / customNamePrice for that region.
+          giftCardExtraPrice: z.number().nonnegative().nullish(),
+          customNamePrice: z.number().nonnegative().nullish(),
         })
       ),
       // Per-zone "ships within N days" overrides, keyed by zoneId (null/blank = no
@@ -429,6 +433,8 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
             deliveryLeadDays: rp.deliveryLeadDays ?? null,
             cashArrangementFeeStepAmount: rp.cashArrangementFeeStepAmount ?? null,
             cashArrangementFeeMarginPercent: rp.cashArrangementFeeMarginPercent ?? null,
+            giftCardExtraPrice: rp.giftCardExtraPrice ?? null,
+            customNamePrice: rp.customNamePrice ?? null,
           },
         ])
       ),
@@ -658,6 +664,8 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
         deliveryLeadDays: v.deliveryLeadDays ?? null,
         cashArrangementFeeStepAmount: v.cashArrangementFeeStepAmount ?? null,
         cashArrangementFeeMarginPercent: v.cashArrangementFeeMarginPercent ?? null,
+        giftCardExtraPrice: v.giftCardExtraPrice ?? null,
+        customNamePrice: v.customNamePrice ?? null,
       })),
       // Per-zone overrides — lead days and the cash-arrangement fee schedule are edited
       // as separate form-state records (see zoneCashArrangementFee* above) but submitted
@@ -970,10 +978,37 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
           ))}
 
           <div className="mt-4 border-t border-ink-100 pt-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-ink-700">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-ink-700">
               Gift options
             </p>
+            <p className="mb-3 text-xs text-ink-500">
+              Default-region charges below. Leave a regional override empty to keep using this
+              default for that region.
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    {...register("customNameEnabled")}
+                    className="h-5 w-5 accent-bloom-600"
+                  />
+                  <span className="text-sm font-medium text-ink-900">
+                    Offer a custom name add-on
+                  </span>
+                </label>
+                <Input
+                  label="Custom name extra charge (default region)"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  disabled={!customNameEnabled}
+                  error={errors.customNamePrice?.message}
+                  {...register("customNamePrice", {
+                    setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+                  })}
+                />
+              </div>
               <div className="flex flex-col gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-2">
                   <input
@@ -986,7 +1021,7 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
                   </span>
                 </label>
                 <Input
-                  label="Extra charge (leave empty for free)"
+                  label="Gift card extra charge (leave empty for free)"
                   type="number"
                   step="0.01"
                   min="0"
@@ -1019,30 +1054,55 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
                   </div>
                 ) : null}
               </div>
-              <div className="flex flex-col gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    {...register("customNameEnabled")}
-                    className="h-5 w-5 accent-bloom-600"
-                  />
-                  <span className="text-sm font-medium text-ink-900">
-                    Offer a custom name add-on
-                  </span>
-                </label>
-                <Input
-                  label="Extra charge"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  disabled={!customNameEnabled}
-                  error={errors.customNamePrice?.message}
-                  {...register("customNamePrice", {
-                    setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
-                  })}
-                />
-              </div>
             </div>
+
+            {overrideRegions.map((region) => (
+              <div key={`gift-${region.id}`} className="mt-4 border-t border-ink-100 pt-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-ink-700">
+                  Gift option prices · {region.name} ({region.currency})
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {/* Custom name first — matches the storefront "Add Custom Name (+ …)?"
+                      line, so region overrides are harder to put in the wrong field. */}
+                  <Input
+                    label={`Custom name extra (${region.currency})`}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    hint="Overrides the default custom-name charge for this region only"
+                    disabled={!customNameEnabled}
+                    error={
+                      (
+                        errors.regionPrices as
+                          | Record<string, { customNamePrice?: { message?: string } }>
+                          | undefined
+                      )?.[region.id]?.customNamePrice?.message
+                    }
+                    {...register(`regionPrices.${region.id}.customNamePrice`, {
+                      setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+                    })}
+                  />
+                  <Input
+                    label={`Gift card extra (${region.currency})`}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    hint="Overrides the default gift-card charge for this region only"
+                    disabled={!giftCardEnabled}
+                    error={
+                      (
+                        errors.regionPrices as
+                          | Record<string, { giftCardExtraPrice?: { message?: string } }>
+                          | undefined
+                      )?.[region.id]?.giftCardExtraPrice?.message
+                    }
+                    {...register(`regionPrices.${region.id}.giftCardExtraPrice`, {
+                      setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+                    })}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
 
