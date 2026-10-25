@@ -1,10 +1,5 @@
 import type { Metadata } from "next";
-import {
-  Plus_Jakarta_Sans,
-  Fraunces,
-  IBM_Plex_Sans_Arabic,
-  Noto_Sans_Arabic,
-} from "next/font/google";
+import localFont from "next/font/local";
 import { dehydrate } from "@tanstack/react-query";
 import {
   GoogleTagManagerScript,
@@ -26,59 +21,51 @@ import { queryKeys } from "@/services/queryKeys";
 import "./globals.css";
 
 /**
- * Single typeface for the entire product. Plus Jakarta Sans gives us a clean,
- * modern, SaaS-grade voice from 13px UI text up to large editorial display
- * weights without any face-mixing. We expose two CSS variables — one for body,
- * one for display — but they resolve to the same family with different
- * weights / tracking applied at the component level via Tailwind utilities.
+ * Self-hosted faces (next/font/local). next/font/google downloads from
+ * fonts.gstatic.com at build time; Turbopack flaky CDN responses (extensionless
+ * /l/font?kit=… URLs) fail Docker/Coolify builds with "could not resolve …
+ * Fraunces". Bundling the woff2 files removes that network dependency.
+ * Same CSS variables as before so Tailwind / globals.css stay unchanged.
  */
-const jakarta = Plus_Jakarta_Sans({
+const jakarta = localFont({
+  src: [
+    { path: "./fonts/plus-jakarta-sans-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/plus-jakarta-sans-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/plus-jakarta-sans-latin-600-normal.woff2", weight: "600", style: "normal" },
+  ],
   variable: "--font-jakarta",
-  subsets: ["latin"],
   display: "swap",
-  // Only the weights actually used in the UI (400 body, 500 medium, 600
-  // semibold). 700/800 were shipped but never referenced — dropping them
-  // removes two font files from the critical path.
-  weight: ["400", "500", "600"],
 });
 
-/**
- * Fraunces — a warm, high-contrast editorial serif — is our DISPLAY face for
- * headings. Paired with Jakarta for body/UI, it gives the boutique a refined,
- * florist-editorial voice instead of a generic single-sans look.
- */
-const fraunces = Fraunces({
+const fraunces = localFont({
+  src: [
+    { path: "./fonts/fraunces-latin-wght-normal.woff2", weight: "400 600", style: "normal" },
+    { path: "./fonts/fraunces-latin-wght-italic.woff2", weight: "400 600", style: "italic" },
+  ],
   variable: "--font-fraunces",
-  subsets: ["latin"],
   display: "swap",
-  // Display weights in use are 400/500/600; 700 was unused. Italic is kept for
-  // the editorial heading accents (e.g. hero title accent).
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
 });
 
-/**
- * Arabic faces. The Latin pair above (Jakarta/Fraunces) ship no Arabic glyphs,
- * so Arabic text would otherwise fall back to an uncontrolled OS font. These
- * mirror the two-role split (display heading / body) with Arabic-covering
- * faces and match the client's live site exactly: IBM Plex Sans Arabic for
- * headings, Noto Sans Arabic for body. Applied only under `dir="rtl"` via
- * globals.css so the Latin experience is untouched.
- */
-const ibmPlexArabic = IBM_Plex_Sans_Arabic({
+const ibmPlexArabic = localFont({
+  src: [
+    { path: "./fonts/ibm-plex-sans-arabic-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-arabic-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-arabic-700-normal.woff2", weight: "700", style: "normal" },
+  ],
   variable: "--font-arabic-heading",
-  subsets: ["arabic"],
   display: "swap",
   preload: true,
-  weight: ["500", "600", "700"],
 });
 
-const notoArabic = Noto_Sans_Arabic({
+const notoArabic = localFont({
+  src: [
+    { path: "./fonts/noto-sans-arabic-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/noto-sans-arabic-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/noto-sans-arabic-600-normal.woff2", weight: "600", style: "normal" },
+  ],
   variable: "--font-arabic-body",
-  subsets: ["arabic"],
   display: "swap",
   preload: true,
-  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {

@@ -123,6 +123,10 @@ export interface ApiProductRegionPrice {
    *  utils/cashArrangementMath.js on the backend for the full precedence chain). */
   cashArrangementFeeStepAmount?: number | null;
   cashArrangementFeeMarginPercent?: number | null;
+  /** Per-region gift-card extra charge. Null = use product global giftCardExtraPrice. */
+  giftCardExtraPrice?: number | null;
+  /** Per-region custom-name extra charge. Null = use product global customNamePrice. */
+  customNamePrice?: number | null;
 }
 
 /** Per-zone "ships within N days" + cash-arrangement fee overrides for this product. One
