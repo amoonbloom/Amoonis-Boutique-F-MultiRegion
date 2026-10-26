@@ -1844,89 +1844,54 @@ function OrderReviewCard({
 
         <Divider />
 
-        {/* Payment: Online (MyFatoorah and/or Tabby as sub-options) vs COD. */}
+        {/* Payment: top-level siblings — Card/Apple Pay, Tabby, COD (only when each is available). */}
         {onlinePayAvailable ? (
           <div className="flex flex-col gap-3">
-            <div
-              className={cn(
-                "rounded-2xl border transition",
-                paymentMethod === "MYFATOORAH" || paymentMethod === "TABBY"
-                  ? "border-ink-900 bg-cream-50"
-                  : "border-ink-200 bg-white"
-              )}
-            >
-              <label className="flex cursor-pointer items-start gap-3 p-4">
+            {myFatoorahAvailable ? (
+              <label
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition",
+                  paymentMethod === "MYFATOORAH"
+                    ? "border-ink-900 bg-cream-50"
+                    : "border-ink-200 bg-white"
+                )}
+              >
                 <input
                   type="radio"
                   name="payment"
                   className="mt-1 h-4 w-4 accent-ink-900"
-                  checked={paymentMethod === "MYFATOORAH" || paymentMethod === "TABBY"}
-                  onChange={() =>
-                    onPaymentMethodChange(
-                      myFatoorahAvailable
-                        ? "MYFATOORAH"
-                        : "TABBY"
-                    )
-                  }
+                  checked={paymentMethod === "MYFATOORAH"}
+                  onChange={() => onPaymentMethodChange("MYFATOORAH")}
                 />
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-ink-900">{t("checkout.payOnline")}</p>
-                  <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payOnlineHint")}</p>
+                <div>
+                  <p className="font-medium text-ink-900">{t("checkout.payCard")}</p>
+                  <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payCardHint")}</p>
                 </div>
               </label>
+            ) : null}
 
-              {/* Nested providers — only while Online payment is selected. */}
-              {(paymentMethod === "MYFATOORAH" || paymentMethod === "TABBY") &&
-              (myFatoorahAvailable || tabbyAvailable) ? (
-                <div className="ms-8 me-4 mb-4 flex flex-col gap-2 border-s-2 border-ink-100 ps-4">
-                  {myFatoorahAvailable ? (
-                    <label
-                      className={cn(
-                        "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition",
-                        paymentMethod === "MYFATOORAH"
-                          ? "border-ink-900 bg-white"
-                          : "border-ink-200 bg-white/70"
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="online-provider"
-                        className="mt-1 h-4 w-4 accent-ink-900"
-                        checked={paymentMethod === "MYFATOORAH"}
-                        onChange={() => onPaymentMethodChange("MYFATOORAH")}
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-ink-900">{t("checkout.payCard")}</p>
-                        <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payCardHint")}</p>
-                      </div>
-                    </label>
-                  ) : null}
-
-                  {tabbyAvailable ? (
-                    <label
-                      className={cn(
-                        "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition",
-                        paymentMethod === "TABBY"
-                          ? "border-ink-900 bg-white"
-                          : "border-ink-200 bg-white/70"
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="online-provider"
-                        className="mt-1 h-4 w-4 accent-ink-900"
-                        checked={paymentMethod === "TABBY"}
-                        onChange={() => onPaymentMethodChange("TABBY")}
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-ink-900">{t("checkout.payTabby")}</p>
-                        <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payTabbyHint")}</p>
-                      </div>
-                    </label>
-                  ) : null}
+            {tabbyAvailable ? (
+              <label
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition",
+                  paymentMethod === "TABBY"
+                    ? "border-ink-900 bg-cream-50"
+                    : "border-ink-200 bg-white"
+                )}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  className="mt-1 h-4 w-4 accent-ink-900"
+                  checked={paymentMethod === "TABBY"}
+                  onChange={() => onPaymentMethodChange("TABBY")}
+                />
+                <div>
+                  <p className="font-medium text-ink-900">{t("checkout.payTabby")}</p>
+                  <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payTabbyHint")}</p>
                 </div>
-              ) : null}
-            </div>
+              </label>
+            ) : null}
 
             {!codUnavailable ? (
               <label
