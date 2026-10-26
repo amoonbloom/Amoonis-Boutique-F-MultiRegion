@@ -51,6 +51,9 @@ export interface ApiRegion {
    *  Drive which options the storefront shows; Apple Pay is also enforced server-side. */
   applePayEnabled: boolean;
   cardPaymentEnabled: boolean;
+  /** When true, checkout shows and requires the Saudi National Address short
+   *  code (4 letters + 4 digits). Opt-in per region — enable for SA only. */
+  shortAddressEnabled: boolean;
   /** Region-wide delivery blackout dates (holidays/closures). */
   blackoutDates: ApiBlackoutDate[];
   /** ISO 3166-1 alpha-2 code (e.g. "AE") — renders this region's flag in the
@@ -136,6 +139,7 @@ export interface ApiRegionCreateInput {
   onlinePaymentEnabled?: boolean;
   applePayEnabled?: boolean;
   cardPaymentEnabled?: boolean;
+  shortAddressEnabled?: boolean;
   blackoutDates?: ApiBlackoutDate[];
   iso2?: string | null;
   urlSlug?: string | null;

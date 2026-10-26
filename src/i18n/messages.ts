@@ -1794,6 +1794,9 @@ export const messages = {
         applePayEnabledHint: "Show Apple Pay as an online payment option in this region. Requires online payment to be on, plus Apple Pay enabled and the website domain registered in MyFatoorah.",
         cardPaymentEnabledLabel: "Card payment",
         cardPaymentEnabledHint: "Show card payment as an online option in this region. Requires online payment to be on.",
+        shortAddressEnabledLabel: "National Address (short code) required",
+        shortAddressEnabledHint:
+          "Show and require the 8-character National Address short code at checkout (4 letters + 4 digits). Enable for Saudi Arabia only; leave off for other regions.",
         blackoutDatesLabel: "Blackout dates",
         blackoutDatesHint: "Holidays or closures when no delivery runs in this region (applies to every zone).",
         blackoutDateLabel: "Date",
@@ -3848,6 +3851,9 @@ export const messages = {
         applePayEnabledHint: "إظهار Apple Pay كخيار دفع إلكتروني في هذه المنطقة. يتطلب تفعيل الدفع الإلكتروني، وتفعيل Apple Pay وتسجيل نطاق الموقع في ماي فاتورة.",
         cardPaymentEnabledLabel: "الدفع بالبطاقة",
         cardPaymentEnabledHint: "إظهار الدفع بالبطاقة كخيار إلكتروني في هذه المنطقة. يتطلب تفعيل الدفع الإلكتروني.",
+        shortAddressEnabledLabel: "العنوان الوطني (الرمز المختصر) مطلوب",
+        shortAddressEnabledHint:
+          "إظهار وطلب رمز العنوان الوطني المكوّن من 8 خانات عند الدفع (4 أحرف + 4 أرقام). فعّله للسعودية فقط واتركه معطّلاً لباقي المناطق.",
         blackoutDatesLabel: "أيام الإيقاف",
         blackoutDatesHint: "العطلات أو الإغلاقات التي يتوقف فيها التوصيل لهذه المنطقة.",
         blackoutDateLabel: "التاريخ",

@@ -277,9 +277,9 @@ export interface ApiCashArrangementRequestInput {
 export interface ApiCheckoutInput {
   addressId?: string;
   shippingAddress?: OrderShippingAddressInput;
-  /** Saudi National Address short code (4 letters + 4 digits). Sent at the TOP level, not
-   *  inside shippingAddress, so it is captured whether a saved or new address is used. */
-  shortAddress: string;
+  /** Saudi National Address short code (4 letters + 4 digits). Required only when the
+   *  region's shortAddressEnabled is on. Sent at the TOP level, not inside shippingAddress. */
+  shortAddress?: string;
   paymentMethod?: PaymentMethod;
   promoCode?: string;
   /** Defaults to STANDARD on the backend when omitted. */
@@ -304,8 +304,8 @@ export interface ApiGuestCheckoutItem {
 export interface ApiGuestCheckoutInput {
   items: ApiGuestCheckoutItem[];
   shippingAddress: OrderShippingAddressInput;
-  /** Saudi National Address short code (4 letters + 4 digits) — required. */
-  shortAddress: string;
+  /** Saudi National Address short code — required only when the region enables it. */
+  shortAddress?: string;
   /** Optional — enables the confirmation email and links the order on sign-up. */
   email?: string;
   orderMessage?: string;

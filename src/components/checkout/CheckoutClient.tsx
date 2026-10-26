@@ -391,6 +391,8 @@ export function CheckoutClient() {
     queryFn: () => regionsApi.list(),
   });
   const currentRegion = regionsQuery.data?.find((r) => r.code === regionCode);
+  // Saudi National Address short code — only when this region opts in via admin.
+  const shortAddressRequired = Boolean(currentRegion?.shortAddressEnabled);
 
   // The delivery zone that actually governs this order: the inline "new address"
   // form's picked zone, or the saved address's own zone when one is selected.
@@ -620,15 +622,20 @@ export function CheckoutClient() {
           ? new Date(`${scheduledDeliveryAt}T12:00:00Z`).toISOString()
           : undefined;
 
-      // Short address is required regardless of which address was chosen. Validate it
-      // BEFORE the address branch so the customer sees this error even when the rest of
-      // the form is incomplete, and surface it inline on the field (not only as a toast).
-      const normalizedShortAddress = maskShortAddress(shortAddress);
-      if (!isValidShortAddress(normalizedShortAddress)) {
-        setShortAddressError(t("checkout.shortAddressInvalid"));
-        throw new Error(t("checkout.shortAddressInvalid"));
+      // National Address short code — required only when Region.shortAddressEnabled
+      // (typically Saudi Arabia). Other regions must not be blocked by this field.
+      let normalizedShortAddress: string | undefined;
+      if (shortAddressRequired) {
+        const cleaned = maskShortAddress(shortAddress);
+        if (!isValidShortAddress(cleaned)) {
+          setShortAddressError(t("checkout.shortAddressInvalid"));
+          throw new Error(t("checkout.shortAddressInvalid"));
+        }
+        normalizedShortAddress = cleaned;
+        setShortAddressError(null);
+      } else {
+        setShortAddressError(null);
       }
-      setShortAddressError(null);
 
       let resolvedAddressId: string | undefined;
       let inlineAddress: NewAddressValues | undefined;
@@ -855,6 +862,7 @@ export function CheckoutClient() {
             zonesLoading={zonesQuery.isPending}
             zoneValue={zoneValue}
             onZoneChange={onZoneChange}
+            shortAddressRequired={shortAddressRequired}
             shortAddress={shortAddress}
             onShortAddressChange={(v) => {
               setShortAddress(v);
@@ -1011,8 +1019,10 @@ interface BillingShippingCardProps {
   zonesLoading: boolean;
   zoneValue: string;
   onZoneChange: (id: string) => void;
-  /** Saudi National Address short code. Lives OUTSIDE the new-address form because it is
-   *  required for every order — including one shipped to a previously saved address. */
+  /** Whether this region's admin opted into the National Address short code. */
+  shortAddressRequired: boolean;
+  /** Saudi National Address short code. Outside the new-address form so it still
+   *  appears when shipping to a saved address (addresses may predate this field). */
   shortAddress: string;
   onShortAddressChange: (v: string) => void;
   shortAddressError: string | null;
@@ -1036,6 +1046,7 @@ function BillingShippingCard({
   zonesLoading,
   zoneValue,
   onZoneChange,
+  shortAddressRequired,
   shortAddress,
   onShortAddressChange,
   shortAddressError,
@@ -1166,24 +1177,26 @@ function BillingShippingCard({
               </p>
             ) : null}
           </div>
-          {/* Saudi National Address — required; placed above phone as requested. */}
-          <Input
-            label={t("checkout.shortAddress")}
-            requiredMark
-            hint={t("checkout.shortAddressHint")}
-            placeholder={SHORT_ADDRESS_PLACEHOLDER}
-            dir="ltr"
-            inputMode="text"
-            autoCapitalize="characters"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={SHORT_ADDRESS_LENGTH}
-            value={shortAddress}
-            onChange={(e) => onShortAddressChange(maskShortAddress(e.target.value))}
-            error={shortAddressError ?? undefined}
-            className="uppercase tracking-[0.18em]"
-            containerClassName="sm:col-span-2"
-          />
+          {/* National Address — only when Region.shortAddressEnabled (e.g. Saudi). */}
+          {shortAddressRequired ? (
+            <Input
+              label={t("checkout.shortAddress")}
+              requiredMark
+              hint={t("checkout.shortAddressHint")}
+              placeholder={SHORT_ADDRESS_PLACEHOLDER}
+              dir="ltr"
+              inputMode="text"
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={SHORT_ADDRESS_LENGTH}
+              value={shortAddress}
+              onChange={(e) => onShortAddressChange(maskShortAddress(e.target.value))}
+              error={shortAddressError ?? undefined}
+              className="uppercase tracking-[0.18em]"
+              containerClassName="sm:col-span-2"
+            />
+          ) : null}
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor="checkout-phone"
@@ -1236,10 +1249,9 @@ function BillingShippingCard({
             />
           ) : null}
         </div>
-      ) : (
-        /* Saved address path — National Address is still required (addresses may
-           predate this field), so keep the input visible when a saved address is
-           selected. */
+      ) : shortAddressRequired ? (
+        /* Saved address path — still collect National Address when this region requires it
+           (saved addresses may predate the field). */
         <Input
           label={t("checkout.shortAddress")}
           requiredMark
@@ -1256,7 +1268,7 @@ function BillingShippingCard({
           error={shortAddressError ?? undefined}
           className="uppercase tracking-[0.18em]"
         />
-      )}
+      ) : null}
 
       {/* Offer sign-in to guests — optional, never blocks checkout. */}
       {!isAuthed ? (
