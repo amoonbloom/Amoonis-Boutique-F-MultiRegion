@@ -48,6 +48,9 @@ import {
   CashArrangementSummary,
   type CashArrangementSummaryProps,
 } from "./CashArrangementSummary";
+import { TabbyLogo } from "./TabbyLogo";
+import { TabbyCheckoutCard } from "./TabbyCheckoutCard";
+import { getTabbySnippetConfig } from "@/config/tabbyPublic";
 import { regionsApi } from "@/features/regions/api/regions.api";
 import { deliveryZonesApi } from "@/features/delivery-zones/api/delivery-zones.api";
 import { deliveryConfigApi } from "@/features/delivery-config/api/delivery-config.api";
@@ -1503,6 +1506,7 @@ function OrderReviewCard({
 }: OrderReviewCardProps) {
   const { currency, locale } = useCurrency();
   const { t, locale: appLocale } = useT();
+  const tabbySnippet = getTabbySnippetConfig();
 
   // ONE combined VAT figure = product VAT + cash-arrangement fee VAT (both at the same rate),
   // shown on a single "VAT" line — the fee's VAT is not split out next to the fee.
@@ -1883,26 +1887,40 @@ function OrderReviewCard({
             ) : null}
 
             {tabbyAvailable ? (
-              <label
+              <div
                 className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition",
+                  "rounded-2xl border p-4 transition",
                   paymentMethod === "TABBY"
                     ? "border-ink-900 bg-cream-50"
                     : "border-ink-200 bg-white"
                 )}
               >
-                <input
-                  type="radio"
-                  name="payment"
-                  className="mt-1 h-4 w-4 accent-ink-900"
-                  checked={paymentMethod === "TABBY"}
-                  onChange={() => onPaymentMethodChange("TABBY")}
-                />
-                <div>
-                  <p className="font-medium text-ink-900">{t("checkout.payTabby")}</p>
-                  <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payTabbyHint")}</p>
-                </div>
-              </label>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="radio"
+                    name="payment"
+                    className="mt-1 h-4 w-4 accent-ink-900"
+                    checked={paymentMethod === "TABBY"}
+                    onChange={() => onPaymentMethodChange("TABBY")}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-ink-900">{t("checkout.payTabby")}</p>
+                      <TabbyLogo className="h-5 w-auto shrink-0" />
+                    </div>
+                    <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payTabbyHint")}</p>
+                  </div>
+                </label>
+                {paymentMethod === "TABBY" && tabbySnippet.configured ? (
+                  <TabbyCheckoutCard
+                    price={total}
+                    currency={currency}
+                    lang={appLocale === "ar" ? "ar" : "en"}
+                    publicKey={tabbySnippet.publicKey}
+                    merchantCode={tabbySnippet.merchantCode}
+                  />
+                ) : null}
+              </div>
             ) : null}
 
             {!codUnavailable ? (

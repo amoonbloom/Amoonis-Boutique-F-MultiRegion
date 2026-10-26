@@ -425,8 +425,12 @@ export const messages = {
       payOnlineHint: "Pay the full amount now securely with card or Apple Pay.",
       payCard: "Pay online (Card / Apple Pay)",
       payCardHint: "Pay the full amount now securely with card or Apple Pay.",
-      payTabby: "Pay with Tabby",
-      payTabbyHint: "Split into 4 interest-free payments.",
+      payTabby: "Pay later with Tabby",
+      payTabbyHint: "4 interest-free payments. No fees.",
+      tabbyCancelMessage:
+        "You aborted the payment. Please retry or choose another payment method.",
+      tabbyFailureMessage:
+        "Sorry, Tabby is unable to approve this purchase. Please use an alternative payment method for your order.",
       cashArrangementTitle: "Add cash arrangement",
       cashArrangementSubtitle: "Optional for flower orders",
       cashAmountLabel: "Cash amount",
@@ -2502,8 +2506,12 @@ export const messages = {
       payOnlineHint: "ادفع المبلغ كاملاً الآن بأمان عبر البطاقة أو Apple Pay.",
       payCard: "الدفع الإلكتروني (بطاقة / Apple Pay)",
       payCardHint: "ادفع المبلغ كاملاً الآن بأمان عبر البطاقة أو Apple Pay.",
-      payTabby: "الدفع عبر تابي",
-      payTabbyHint: "قسّم المبلغ إلى 4 دفعات بدون فوائد.",
+      payTabby: "ادفع لاحقًا مع تابي",
+      payTabbyHint: "4 دفعات بدون فوائد.",
+      tabbyCancelMessage:
+        "لقد ألغيت الدفعة. فضلاً حاول مجددًا أو اختر طريقة دفع أخرى.",
+      tabbyFailureMessage:
+        "نأسف، تابي غير قادرة على الموافقة على هذه العملية. الرجاء استخدام طريقة دفع أخرى.",
       cashArrangementTitle: "إضافة ترتيب مالي نقدي",
       cashArrangementSubtitle: "اختياري لطلبات الزهور",
       cashAmountLabel: "المبلغ النقدي",

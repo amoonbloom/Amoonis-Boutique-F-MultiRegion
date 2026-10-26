@@ -13,7 +13,17 @@ export default async function OrderErrorPage(
   const search = await props.searchParams;
   const message =
     typeof search?.message === "string" ? search.message : undefined;
+  const tabbyReason =
+    typeof search?.tabby === "string" ? search.tabby.toLowerCase() : undefined;
   const locale = await getServerLocale();
+
+  const body =
+    message ||
+    (tabbyReason === "cancel"
+      ? t(locale, "checkout.tabbyCancelMessage")
+      : tabbyReason === "failure"
+        ? t(locale, "checkout.tabbyFailureMessage")
+        : t(locale, "order.errorBody"));
 
   return (
     <Container className="flex min-h-[60vh] flex-col items-center justify-center py-24 text-center">
@@ -26,9 +36,7 @@ export default async function OrderErrorPage(
       <h1 className="mt-2 font-display text-5xl font-medium leading-tight text-ink-900 md:text-6xl">
         {t(locale, "order.errorTitle")}
       </h1>
-      <p className="mt-4 max-w-lg text-base text-ink-600">
-        {message ? message : t(locale, "order.errorBody")}
-      </p>
+      <p className="mt-4 max-w-lg text-base text-ink-600">{body}</p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <LocalizedLink href={ROUTES.checkout} className="contents">
           <Button size="lg">{t(locale, "order.tryAgain")}</Button>

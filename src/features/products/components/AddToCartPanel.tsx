@@ -26,6 +26,8 @@ import { toggleWishlistItem } from "@/store/slices/wishlist.slice";
 import type { CartLineCashArrangement } from "@/store/slices/cart.slice";
 import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/useT";
+import { TabbyPromoSnippet } from "@/components/checkout/TabbyPromoSnippet";
+import { getTabbySnippetConfig } from "@/config/tabbyPublic";
 import type { Product } from "../types";
 import { resolveActivePhotoGroup } from "../variantResolution";
 
@@ -49,8 +51,9 @@ interface UnitConfig {
 export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCartPanelProps) {
   const dispatch = useAppDispatch();
   const { add } = useCart();
-  const { t } = useT();
-  const { currency, locale } = useCurrency();
+  const { t, locale: appLocale } = useT();
+  const { currency, locale, tabbyEnabled } = useCurrency();
+  const tabbySnippet = getTabbySnippetConfig();
   // Selection is owned by PdpImageProvider (shared with ProductGallery) so picking a
   // colour here and clicking its photo in the gallery are the same action.
   // `registerAddHandler` lets the mobile sticky bar trigger this panel's exact
@@ -578,6 +581,17 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
           </div>
         </div>
       )}
+
+      {tabbyEnabled && tabbySnippet.configured && unitPrice > 0 ? (
+        <TabbyPromoSnippet
+          price={unitPrice}
+          currency={currency}
+          lang={appLocale === "ar" ? "ar" : "en"}
+          source="product"
+          publicKey={tabbySnippet.publicKey}
+          merchantCode={tabbySnippet.merchantCode}
+        />
+      ) : null}
 
       {/* Quantity + Add to cart in one row (client-style); the quantity box matches the
           button height. Sold-out state is shown on the button itself, so no separate note. */}

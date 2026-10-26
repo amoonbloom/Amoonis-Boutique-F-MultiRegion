@@ -19,6 +19,8 @@ import { usePublicVat } from "@/features/vat/hooks/usePublicVat";
 import { vatHint } from "@/features/vat/vatDisplay";
 import { useCartCashTotals } from "@/features/cash-arrangement/hooks/useCartCashTotals";
 import { useT } from "@/i18n/useT";
+import { TabbyPromoSnippet } from "@/components/checkout/TabbyPromoSnippet";
+import { getTabbySnippetConfig } from "@/config/tabbyPublic";
 
 interface CartSummaryProps {
   variant?: "page" | "checkout";
@@ -28,7 +30,8 @@ export function CartSummary({ variant = "page" }: CartSummaryProps) {
   const items = useAppSelector((s) => s.cart.items);
   const { currency, locale, countryCode } = useCurrency();
   const regionCopy = useRegionCopy();
-  const { t } = useT();
+  const { t, locale: appLocale } = useT();
+  const tabbySnippet = getTabbySnippetConfig();
   const subtotal = items.reduce(
     (sum, i) => sum + i.unitPrice * i.quantity,
     0
@@ -153,6 +156,20 @@ export function CartSummary({ variant = "page" }: CartSummaryProps) {
         <p className="-mt-2 text-xs text-ink-500">
           {t("product.vatInclusive")}
         </p>
+      ) : null}
+
+      {variant === "page" &&
+      currentRegion?.tabbyEnabled &&
+      tabbySnippet.configured &&
+      total > 0 ? (
+        <TabbyPromoSnippet
+          price={total}
+          currency={currency}
+          lang={appLocale === "ar" ? "ar" : "en"}
+          source="cart"
+          publicKey={tabbySnippet.publicKey}
+          merchantCode={tabbySnippet.merchantCode}
+        />
       ) : null}
 
       {variant === "page" && (
