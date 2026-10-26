@@ -104,6 +104,7 @@ export function RegionForm({
       applePayEnabled: z.boolean(),
       cardPaymentEnabled: z.boolean(),
       shortAddressEnabled: z.boolean(),
+      tabbyEnabled: z.boolean(),
       blackoutDates: z.array(
         z.object({
           id: z.string().optional(),
@@ -186,6 +187,7 @@ export function RegionForm({
       applePayEnabled: true,
       cardPaymentEnabled: true,
       shortAddressEnabled: false,
+      tabbyEnabled: false,
       blackoutDates: [],
       iso2: "",
       urlSlug: "",
@@ -270,6 +272,7 @@ export function RegionForm({
       applePayEnabled: initial.applePayEnabled ?? true,
       cardPaymentEnabled: initial.cardPaymentEnabled ?? true,
       shortAddressEnabled: initial.shortAddressEnabled ?? false,
+      tabbyEnabled: initial.tabbyEnabled ?? false,
       blackoutDates: (initial.blackoutDates ?? []).map((b) => ({
         id: b.id,
         date: b.date,
@@ -317,6 +320,7 @@ export function RegionForm({
       applePayEnabled: v.applePayEnabled,
       cardPaymentEnabled: v.cardPaymentEnabled,
       shortAddressEnabled: v.shortAddressEnabled,
+      tabbyEnabled: v.tabbyEnabled,
       blackoutDates: (v.blackoutDates ?? [])
         .filter((b) => b.date?.trim())
         .map((b) => ({
@@ -578,6 +582,15 @@ export function RegionForm({
                 </label>
                 <p className="mt-1 text-xs text-ink-500">{t("admin.regionForm.cardPaymentEnabledHint")}</p>
               </div>
+              <label className="mt-4 flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  {...register("tabbyEnabled")}
+                  className="h-5 w-5 accent-bloom-600"
+                />
+                <span className="text-sm text-ink-900">{t("admin.regionForm.tabbyEnabledLabel")}</span>
+              </label>
+              <p className="mt-1 text-xs text-ink-500">{t("admin.regionForm.tabbyEnabledHint")}</p>
               <label className="mt-4 flex cursor-pointer items-center gap-3">
                 <input
                   type="checkbox"

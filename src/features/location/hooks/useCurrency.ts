@@ -64,5 +64,6 @@ export function useCurrency() {
     onlinePaymentEnabled: region?.onlinePaymentEnabled ?? false,
     applePayEnabled: region?.applePayEnabled ?? true,
     cardPaymentEnabled: region?.cardPaymentEnabled ?? true,
+    tabbyEnabled: region?.tabbyEnabled ?? false,
   };
 }

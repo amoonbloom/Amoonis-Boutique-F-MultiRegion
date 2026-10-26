@@ -13,9 +13,9 @@ export type OrderStatus =
   | "FAILED"
   | "DRAFT";
 
-// The web only initiates COD, but the backend can return MYFATOORAH on orders
-// placed via other clients (e.g. mobile) that the web may still display.
-export type PaymentMethod = "COD" | "MYFATOORAH";
+// Checkout can initiate COD, MYFATOORAH (card/Apple Pay), or TABBY (Pay in 4).
+// Mobile or older clients may still return only a subset — UI must handle all three.
+export type PaymentMethod = "COD" | "MYFATOORAH" | "TABBY";
 
 /** STANDARD (default) or SCHEDULED (customer picked a future date/time at checkout). */
 export type DeliveryType = "STANDARD" | "SCHEDULED";
