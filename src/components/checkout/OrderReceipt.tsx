@@ -1,8 +1,8 @@
 "use client";
 
 import { LocalizedLink } from "@/components/ui/LocalizedLink";
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Container, Button } from "@/components/ui";
 import { Skeleton } from "@/components/ui/Loader";
 import { ArrowRight } from "@/components/icons";
@@ -10,6 +10,7 @@ import { ordersApi } from "@/features/orders/api/orders.api";
 import { queryKeys } from "@/services/queryKeys";
 import { ROUTES } from "@/constants/routes";
 import { useT } from "@/i18n/useT";
+import { useCart } from "@/features/cart/hooks/useCart";
 import { trackPurchase } from "@/lib/gtm";
 import { trackPixelPurchase } from "@/lib/metaPixel";
 import type { MessageKey } from "@/i18n";
@@ -22,6 +23,9 @@ import { ReceiptStage, ConfirmationHero, ReceiptCard, ReceiptActions } from "./r
  */
 export function OrderReceipt({ orderId }: { orderId?: string }) {
   const { t } = useT();
+  const cart = useCart();
+  const queryClient = useQueryClient();
+  const clearedRef = useRef(false);
 
   const query = useQuery({
     queryKey: queryKeys.orders.detail(orderId ?? "none"),
@@ -48,6 +52,16 @@ export function OrderReceipt({ orderId }: { orderId?: string }) {
     trackPurchase(query.data);
     trackPixelPurchase(query.data);
   }, [query.data]);
+
+  // Clear local cart after a successful online payment (Tabby/MyFatoorah). COD
+  // already clears at Place order; redirect payments skip that path.
+  useEffect(() => {
+    if (clearedRef.current) return;
+    if (query.data?.paymentStatus !== "PAID") return;
+    clearedRef.current = true;
+    cart.clear();
+    queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
+  }, [query.data?.paymentStatus, cart, queryClient]);
 
   return (
     <ReceiptStage>

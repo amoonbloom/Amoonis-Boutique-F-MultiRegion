@@ -229,7 +229,13 @@ export function AccountOrderDetail({ id }: { id: string }) {
       <section className="rounded-2xl border border-ink-100 bg-white p-5 sm:p-6">
         <h3 className="mb-2 font-display text-lg text-ink-900">{t("checkout.payment")}</h3>
         <p className="text-sm text-ink-700">
-          {order.paymentMethod === "COD" ? t("checkout.cod") : order.paymentMethod}
+          {order.paymentMethod === "COD"
+            ? t("checkout.cod")
+            : order.paymentMethod === "TABBY"
+              ? t("checkout.payTabby")
+              : order.paymentMethod === "MYFATOORAH"
+                ? t("checkout.payCard")
+                : order.paymentMethod}
           {" · "}
           <span
             className={

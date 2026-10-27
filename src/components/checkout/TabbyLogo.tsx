@@ -1,24 +1,14 @@
-/** Tabby wordmark used next to the approved checkout payment method name. */
+/** Official Tabby wordmark (from Tabby brand / Magento SDK assets). Do not recolour. */
 export function TabbyLogo({ className = "h-5 w-auto" }: { className?: string }) {
   return (
-    <span
-      className={`inline-flex items-center justify-center rounded px-1.5 ${className}`}
-      style={{ backgroundColor: "#3EEDBF", height: "1.25rem", minWidth: "3.25rem" }}
-      role="img"
-      aria-label="Tabby"
-    >
-      <span
-        className="leading-none"
-        style={{
-          color: "#0B0B0B",
-          fontSize: "0.6875rem",
-          fontWeight: 700,
-          letterSpacing: "-0.02em",
-          fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
-        }}
-      >
-        tabby
-      </span>
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public
+    <img
+      src="/brand/tabby-logo.png"
+      alt="Tabby"
+      className={`inline-block object-contain ${className}`}
+      width={72}
+      height={20}
+      decoding="async"
+    />
   );
 }

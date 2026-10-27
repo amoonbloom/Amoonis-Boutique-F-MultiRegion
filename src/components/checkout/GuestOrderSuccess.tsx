@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LocalizedLink } from "@/components/ui/LocalizedLink";
 import { Container, Button } from "@/components/ui";
 import { useIsHydrated } from "@/hooks/useIsHydrated";
@@ -9,6 +9,7 @@ import { CheckIcon, ArrowRight, SparkleIcon } from "@/components/icons";
 import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants/storage-keys";
 import { useT } from "@/i18n/useT";
+import { useCart } from "@/features/cart/hooks/useCart";
 import { trackPurchase } from "@/lib/gtm";
 import { trackPixelPurchase } from "@/lib/metaPixel";
 import { ordersApi } from "@/features/orders/api/orders.api";
@@ -42,6 +43,9 @@ const BENEFITS: MessageKey[] = [
 export function GuestOrderSuccess({ orderId }: { orderId?: string }) {
   const { t } = useT();
   const hydrated = useIsHydrated();
+  const cart = useCart();
+  const queryClient = useQueryClient();
+  const clearedRef = useRef(false);
 
   const stashed = useMemo<ApiOrder | null>(() => {
     if (!hydrated) return null;
@@ -95,6 +99,14 @@ export function GuestOrderSuccess({ orderId }: { orderId?: string }) {
       trackPixelPurchase(order);
     }
   }, [order]);
+
+  useEffect(() => {
+    if (clearedRef.current) return;
+    if (order?.paymentStatus !== "PAID") return;
+    clearedRef.current = true;
+    cart.clear();
+    queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
+  }, [order?.paymentStatus, cart, queryClient]);
 
   return (
     <ReceiptStage>

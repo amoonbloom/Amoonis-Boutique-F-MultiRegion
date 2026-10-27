@@ -8,6 +8,7 @@ import { AddToCartPanel } from "@/features/products/components/AddToCartPanel";
 import { StickyAddToCart } from "@/features/products/components/StickyAddToCart";
 import { ProductGrid } from "@/features/products/components/ProductGrid";
 import { ProductPrice } from "@/features/products/components/ProductPrice";
+import { ProductTabbyPromo } from "@/features/products/components/ProductTabbyPromo";
 import { ProductSubtitle } from "@/features/products/components/ProductSubtitle";
 import { ProductTabs } from "@/features/products/components/ProductTabs";
 import { PdpImageProvider } from "@/features/products/components/PdpImageContext";
@@ -155,6 +156,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             <StaggerItem>
               <ProductPrice product={product} size="lg" />
+              <ProductTabbyPromo product={product} />
             </StaggerItem>
 
             <StaggerItem>
