@@ -54,11 +54,14 @@ export const ordersApi = {
   // on iPhone/Safari, cards everywhere. The backend re-verifies server-side on return.
   async pay(
     id: string,
-    opts: { returnUrl?: string } = {}
+    opts: { returnUrl?: string; lang?: "en" | "ar" } = {}
   ): Promise<{ paymentUrl: string; invoiceId: string | null }> {
+    const body: { returnUrl?: string; lang?: "en" | "ar" } = {};
+    if (opts.returnUrl) body.returnUrl = opts.returnUrl;
+    if (opts.lang) body.lang = opts.lang;
     const { data } = await http.post<
       ApiResponse<{ paymentUrl: string; invoiceId: string | null }>
-    >(`/orders/${id}/pay`, opts.returnUrl ? { returnUrl: opts.returnUrl } : {});
+    >(`/orders/${id}/pay`, body);
     return data.data;
   },
 
@@ -66,11 +69,14 @@ export const ordersApi = {
   // by id where it has no owner. Same shape as pay(); used by the guest checkout flow.
   async guestPay(
     id: string,
-    opts: { returnUrl?: string } = {}
+    opts: { returnUrl?: string; lang?: "en" | "ar" } = {}
   ): Promise<{ paymentUrl: string; invoiceId: string | null }> {
+    const body: { returnUrl?: string; lang?: "en" | "ar" } = {};
+    if (opts.returnUrl) body.returnUrl = opts.returnUrl;
+    if (opts.lang) body.lang = opts.lang;
     const { data } = await http.post<
       ApiResponse<{ paymentUrl: string; invoiceId: string | null }>
-    >(`/orders/${id}/guest-pay`, opts.returnUrl ? { returnUrl: opts.returnUrl } : {});
+    >(`/orders/${id}/guest-pay`, body);
     return data.data;
   },
 

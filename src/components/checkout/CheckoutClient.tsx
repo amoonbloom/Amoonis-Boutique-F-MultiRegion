@@ -218,7 +218,7 @@ export function CheckoutClient() {
   // selector (a delivery zone's `name` — see location.slice.ts) — prefilled
   // into the checkout zone dropdown below instead of forcing a re-pick.
   const selectedCity = useAppSelector((s) => s.location.city);
-  const { t, tc } = useT();
+  const { t, tc, locale: appLocale } = useT();
 
   const [explicitSelection, setExplicitSelection] = useState<
     string | "new" | null
@@ -443,13 +443,19 @@ export function CheckoutClient() {
   // Any redirect-based online method (legacy name kept for prop wiring below).
   const onlinePayAvailable = myFatoorahAvailable || tabbyAvailable;
   const [paymentMethod, setPaymentMethod] = useState<"COD" | "MYFATOORAH" | "TABBY">("COD");
+  // After Tabby rejects a session, block further Place-order clicks until the cart,
+  // phone, or email changes (or the page reloads) — Tabby QA requirement.
+  const [tabbyRejected, setTabbyRejected] = useState(false);
   const payingOnline =
     (paymentMethod === "MYFATOORAH" && myFatoorahAvailable) ||
     (paymentMethod === "TABBY" && tabbyAvailable);
 
   // COD unavailability only blocks a COD order — an online payment is unaffected by it.
   const placeOrderBlocked =
-    (!payingOnline && codUnavailable) || belowMinOrder || aboveMaxOrder;
+    (!payingOnline && codUnavailable) ||
+    belowMinOrder ||
+    aboveMaxOrder ||
+    (paymentMethod === "TABBY" && tabbyRejected);
 
   // Keep the selected method valid as region / COD availability changes.
   useEffect(() => {
@@ -462,6 +468,20 @@ export function CheckoutClient() {
       else if (tabbyAvailable) setPaymentMethod("TABBY");
     }
   }, [myFatoorahAvailable, tabbyAvailable, codUnavailable, paymentMethod]);
+
+  const watchedPhone = watchNewAddr("phone");
+  const watchedEmail = watchNewAddr("email");
+  const cartFingerprint = useMemo(
+    () =>
+      cart.items
+        .map((i) => `${i.productId}:${i.variantKey}:${i.quantity}`)
+        .join("|"),
+    [cart.items]
+  );
+  // Unblock Tabby Place order after cart / phone / email change (Tabby QA).
+  useEffect(() => {
+    setTabbyRejected(false);
+  }, [cartFingerprint, watchedPhone, watchedEmail]);
 
   // VAT preview for the current region. The public endpoint intentionally omits the
   // SPECIFIC_PRODUCTS/SPECIFIC_CATEGORIES scope lists (that's catalog-scoping data, not
@@ -705,7 +725,10 @@ export function CheckoutClient() {
         // Return URL carries ?guest=1 so the browser comes back to the guest success page.
         if (payingOnline) {
           const returnUrl = `${window.location.origin}${localize(ROUTES.orderSuccess)}?guest=1`;
-          const { paymentUrl } = await ordersApi.guestPay(guestOrder.id, { returnUrl });
+          const { paymentUrl } = await ordersApi.guestPay(guestOrder.id, {
+            returnUrl,
+            lang: appLocale === "ar" ? "ar" : "en",
+          });
           return { order: guestOrder, paymentUrl };
         }
         return { order: guestOrder };
@@ -730,7 +753,10 @@ export function CheckoutClient() {
         // Tell the backend where to send the browser back after paying: this region+locale's
         // order-success page (absolute URL). On failure the callback swaps it to order-error.
         const returnUrl = `${window.location.origin}${localize(ROUTES.orderSuccess)}`;
-        const { paymentUrl } = await ordersApi.pay(order.id, { returnUrl });
+        const { paymentUrl } = await ordersApi.pay(order.id, {
+          returnUrl,
+          lang: appLocale === "ar" ? "ar" : "en",
+        });
         return { order, paymentUrl };
       }
       return { order };
@@ -784,6 +810,18 @@ export function CheckoutClient() {
           : err instanceof Error
           ? err.message
           : t("checkout.orderFailed");
+      // Tabby session rejected — keep method selected but block further Place-order
+      // until cart / phone / email change (see tabbyRejected effect above).
+      if (
+        paymentMethod === "TABBY" &&
+        err instanceof ApiError &&
+        (err.status === 422 ||
+          /unable to approve|spending limit|minimum amount|not_available|order_amount/i.test(
+            message
+          ))
+      ) {
+        setTabbyRejected(true);
+      }
       setSubmitError(message);
       toast.error({ title: t("checkout.checkoutFailed"), description: message });
     },
@@ -923,6 +961,8 @@ export function CheckoutClient() {
             tabbyAvailable={tabbyAvailable}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
+            tabbyRejected={tabbyRejected}
+            tabbyRejectMessage={tabbyRejected ? submitError : null}
             belowMinOrder={belowMinOrder}
             aboveMaxOrder={aboveMaxOrder}
             minOrderAmount={minOrderAmount}
@@ -1454,6 +1494,9 @@ interface OrderReviewCardProps {
   tabbyAvailable: boolean;
   paymentMethod: "COD" | "MYFATOORAH" | "TABBY";
   onPaymentMethodChange: (v: "COD" | "MYFATOORAH" | "TABBY") => void;
+  /** Tabby session was rejected — Place order stays blocked until cart/phone/email change. */
+  tabbyRejected: boolean;
+  tabbyRejectMessage: string | null;
   belowMinOrder: boolean;
   aboveMaxOrder: boolean;
   minOrderAmount: number | null;
@@ -1498,6 +1541,8 @@ function OrderReviewCard({
   tabbyAvailable,
   paymentMethod,
   onPaymentMethodChange,
+  tabbyRejected,
+  tabbyRejectMessage,
   belowMinOrder,
   aboveMaxOrder,
   minOrderAmount,
@@ -1908,7 +1953,9 @@ function OrderReviewCard({
                       <p className="font-medium text-ink-900">{t("checkout.payTabby")}</p>
                       <TabbyLogo className="h-5 w-auto shrink-0" />
                     </div>
-                    <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payTabbyHint")}</p>
+                    {tabbyRejected && tabbyRejectMessage ? (
+                      <p className="mt-1 text-xs text-bloom-700">{tabbyRejectMessage}</p>
+                    ) : null}
                   </div>
                 </label>
                 {paymentMethod === "TABBY" && tabbySnippet.configured ? (

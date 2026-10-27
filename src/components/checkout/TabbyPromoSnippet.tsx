@@ -87,10 +87,8 @@ export function TabbyPromoSnippet({
         if (cancelled || thisMount !== mountKey.current) return;
         const host = document.getElementById(containerId);
         if (!host || !window.TabbyPromo) return;
-        const fresh = document.createElement("div");
-        fresh.id = containerId;
-        if (className) fresh.className = className;
-        host.replaceWith(fresh);
+        // Clear in place — never replaceWith (breaks React ownership; cart refresh crash).
+        host.replaceChildren();
         // eslint-disable-next-line no-new
         new window.TabbyPromo({
           selector: `#${containerId}`,
