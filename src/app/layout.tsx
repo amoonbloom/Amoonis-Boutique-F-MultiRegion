@@ -6,6 +6,7 @@ import {
   GoogleTagManagerNoScript,
 } from "@/components/layout/GoogleTagManager";
 import { MetaPixel } from "@/components/layout/MetaPixel";
+import { TikTokPixel } from "@/components/layout/TikTokPixel";
 import { StoreProvider } from "@/store/providers/StoreProvider";
 import { QueryProvider } from "@/store/providers/QueryProvider";
 import { MotionProvider } from "@/components/motion/MotionProvider";
@@ -136,6 +137,7 @@ export default async function RootLayout({
         <GoogleTagManagerNoScript />
         <GoogleTagManagerScript />
         <MetaPixel />
+        <TikTokPixel />
         <StoreProvider
           initialLocale={locale}
           initialCountry={initialCountry}
