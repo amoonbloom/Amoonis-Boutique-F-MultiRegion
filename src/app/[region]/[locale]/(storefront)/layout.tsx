@@ -7,6 +7,7 @@ import { WhatsAppFloatButton } from "@/components/layout/WhatsAppFloatButton";
 import { CartDrawer } from "@/features/cart/components/CartDrawer";
 import { CartPersistence } from "@/features/cart/components/CartPersistence";
 import { CartSync } from "@/features/cart/components/CartSync";
+import { PendingPaymentCartClear } from "@/features/cart/components/PendingPaymentCartClear";
 import { WishlistPersistence } from "@/features/wishlist/components/WishlistPersistence";
 import { LocationPersistence } from "@/features/location/components/LocationPersistence";
 import { RegionLocaleSync } from "@/features/location/components/RegionLocaleSync";
@@ -101,6 +102,7 @@ export default async function StorefrontLayout({
       <AuthHydrator />
       <CartPersistence />
       <CartSync />
+      <PendingPaymentCartClear />
       <WishlistPersistence />
       <RegionLocaleSync />
       <LocationPersistence />

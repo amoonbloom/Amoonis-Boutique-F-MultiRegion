@@ -62,6 +62,7 @@ import { stripKnownCallingCode } from "@/features/regions/countries";
 import { ROUTES } from "@/constants/routes";
 import { useLocalizedHref } from "@/features/location/useLocalizedHref";
 import { STORAGE_KEYS } from "@/constants/storage-keys";
+import { writePendingOnlineOrder } from "@/lib/pendingOnlineOrder";
 import { storage } from "@/lib/storage";
 import { cn } from "@/lib/cn";
 import {
@@ -678,12 +679,19 @@ export function CheckoutClient() {
         throw new Error(t("checkout.chooseAddress"));
       }
 
+      // City for Tabby/shipping: zone name (e.g. Riyadh) when the form has no
+      // free-text city field — never leave it empty so Tabby doesn't get "City".
+      const zoneCityName =
+        zones.find((z) => z.id === inlineAddress?.deliveryZoneId)?.name ||
+        selectedCity ||
+        undefined;
       const shippingAddress = inlineAddress
         ? {
             fullName: inlineAddress.fullName,
             // Strip the spaces/dashes the input allows for readability — the
             // stored value should be one clean digit string, not "+97150 123-4567".
             phone: `${dialCode}${normalizePhoneDigits(inlineAddress.phone).replace(/[\s-]/g, "")}`,
+            city: zoneCityName,
             area: inlineAddress.area,
             deliveryZoneId: inlineAddress.deliveryZoneId || undefined,
           }
@@ -776,6 +784,9 @@ export function CheckoutClient() {
             /* sessionStorage unavailable — success page falls back gracefully */
           }
         }
+        // Remember the order so a later visit can clear the (guest) cart if they
+        // paid on Tabby/MyFatoorah and never returned to our success page.
+        writePendingOnlineOrder(order.id);
         window.location.href = paymentUrl;
         return;
       }

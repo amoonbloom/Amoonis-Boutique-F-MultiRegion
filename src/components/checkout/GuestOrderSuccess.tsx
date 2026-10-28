@@ -12,6 +12,7 @@ import { useT } from "@/i18n/useT";
 import { useCart } from "@/features/cart/hooks/useCart";
 import { trackPurchase } from "@/lib/gtm";
 import { trackPixelPurchase } from "@/lib/metaPixel";
+import { clearPendingOnlineOrder } from "@/lib/pendingOnlineOrder";
 import { ordersApi } from "@/features/orders/api/orders.api";
 import { queryKeys } from "@/services/queryKeys";
 import type { MessageKey } from "@/i18n";
@@ -105,6 +106,7 @@ export function GuestOrderSuccess({ orderId }: { orderId?: string }) {
     if (order?.paymentStatus !== "PAID") return;
     clearedRef.current = true;
     cart.clear();
+    clearPendingOnlineOrder();
     queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
   }, [order?.paymentStatus, cart, queryClient]);
 

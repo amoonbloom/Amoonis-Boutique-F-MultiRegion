@@ -53,6 +53,8 @@ export interface OrderShippingAddressInput {
   fullName: string;
   phone: string;
   area: string;
+  /** Selected delivery city (e.g. Riyadh). Sent for Tabby shipping_address.city. */
+  city?: string;
   deliveryZoneId?: string;
 }
 

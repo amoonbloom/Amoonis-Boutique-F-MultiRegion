@@ -13,6 +13,7 @@ import { useT } from "@/i18n/useT";
 import { useCart } from "@/features/cart/hooks/useCart";
 import { trackPurchase } from "@/lib/gtm";
 import { trackPixelPurchase } from "@/lib/metaPixel";
+import { clearPendingOnlineOrder } from "@/lib/pendingOnlineOrder";
 import type { MessageKey } from "@/i18n";
 import { ReceiptStage, ConfirmationHero, ReceiptCard, ReceiptActions } from "./receiptParts";
 
@@ -60,6 +61,7 @@ export function OrderReceipt({ orderId }: { orderId?: string }) {
     if (query.data?.paymentStatus !== "PAID") return;
     clearedRef.current = true;
     cart.clear();
+    clearPendingOnlineOrder();
     queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
   }, [query.data?.paymentStatus, cart, queryClient]);
 
