@@ -348,7 +348,12 @@ export function OrderDetailPage({ id }: { id: string }) {
           <section className="rounded-2xl border border-ink-100 bg-white p-5 sm:p-6">
             <h3 className="mb-3 font-display text-lg text-ink-900">{t("admin.orderDetailPage.paymentHeading")}</h3>
             <p className="text-sm text-ink-700">
-              {order.paymentMethod === "COD" ? t("admin.orderDetailPage.codLabel") : order.paymentMethod}
+              {order.paymentMethod === "COD"
+                ? t("admin.orderDetailPage.codLabel")
+                : order.paymentMethod === "MYFATOORAH" ||
+                    order.paymentMethod === "MOYASAR"
+                  ? t("checkout.payOnline")
+                  : order.paymentMethod}
             </p>
           </section>
         </aside>

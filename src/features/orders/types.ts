@@ -13,9 +13,49 @@ export type OrderStatus =
   | "FAILED"
   | "DRAFT";
 
-// The web only initiates COD, but the backend can return MYFATOORAH on orders
-// placed via other clients (e.g. mobile) that the web may still display.
-export type PaymentMethod = "COD" | "MYFATOORAH";
+// Checkout can initiate COD or MYFATOORAH/MOYASAR (card/Apple Pay).
+export type PaymentMethod = "COD" | "MYFATOORAH" | "MOYASAR";
+
+/** Public bootstrap from GET /orders/payment/moyasar/form-config (no order yet). */
+export type MoyasarFormBootstrap = {
+  publishableApiKey: string;
+  scriptUrl: string;
+  cssUrl: string;
+  supportedNetworks: string[];
+  applePay: {
+    country: string;
+    label: string;
+    validateMerchantUrl: string;
+  };
+};
+
+/** Moyasar embedded form config returned by POST /orders/:id/pay (mode=embedded). */
+export type MoyasarEmbeddedForm = {
+  publishableApiKey: string;
+  amount: number;
+  currency: string;
+  description: string;
+  callbackUrl: string;
+  language: "en" | "ar";
+  methods: string[];
+  supportedNetworks: string[];
+  metadata: Record<string, string>;
+  scriptUrl: string;
+  cssUrl: string;
+  applePay?: {
+    country: string;
+    label: string;
+    validateMerchantUrl: string;
+  };
+};
+
+export type StartOnlinePaymentResult = {
+  mode: "redirect" | "embedded";
+  paymentUrl: string | null;
+  invoiceId: string | null;
+  form: MoyasarEmbeddedForm | null;
+  orderId: string;
+};
 
 /** STANDARD (default) or SCHEDULED (customer picked a future date/time at checkout). */
 export type DeliveryType = "STANDARD" | "SCHEDULED";
@@ -314,7 +354,7 @@ export interface ApiGuestCheckoutInput {
   deliveryType?: DeliveryType;
   /** Required (and validated as 1-60 days out) when deliveryType is SCHEDULED. ISO datetime. */
   scheduledDeliveryAt?: string;
-  /** COD (default) or MYFATOORAH. For MYFATOORAH, follow up with ordersApi.guestPay(order.id). */
+  /** COD (default) or MYFATOORAH/MOYASAR. Online methods follow up with guestPay. */
   paymentMethod?: PaymentMethod;
   // Cash arrangement is per-item — see ApiGuestCheckoutItem.cashArrangement.
 }

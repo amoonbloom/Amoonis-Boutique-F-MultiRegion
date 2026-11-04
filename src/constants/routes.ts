@@ -8,6 +8,10 @@ export const ROUTES = {
   orderSuccess: "/order/success",
   orderError: "/order/error",
   orderStatus: "/order/status",
+  /** Moyasar embedded card form — customer stays on our domain. */
+  orderPay: "/order/pay",
+  /** Moyasar form callback_url target (after 3DS / pay). */
+  orderMoyasarReturn: "/order/moyasar/return",
   account: "/account",
   orders: "/account/orders",
   wishlist: "/account/wishlist",

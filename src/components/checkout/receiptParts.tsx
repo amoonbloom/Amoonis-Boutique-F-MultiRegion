@@ -410,7 +410,14 @@ export function ReceiptCard({ order }: { order: ApiOrder }) {
           <dl className="mt-2.5 space-y-3 text-sm">
             <MetaRow
               label={t("order.method")}
-              value={order.paymentMethod === "COD" ? t("checkout.cod") : order.paymentMethod}
+              value={
+                order.paymentMethod === "COD"
+                  ? t("checkout.cod")
+                  : order.paymentMethod === "MYFATOORAH" ||
+                      order.paymentMethod === "MOYASAR"
+                    ? t("checkout.payOnline")
+                    : order.paymentMethod
+              }
             />
             <MetaRow
               label={t("order.paymentStatus")}

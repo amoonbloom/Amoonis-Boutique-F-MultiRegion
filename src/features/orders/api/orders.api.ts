@@ -10,8 +10,24 @@ import type {
   ApiOrderHistoryParams,
   ApiOrderListRow,
   ApiOrderStatusLite,
+  MoyasarFormBootstrap,
   OrderStatus,
+  StartOnlinePaymentResult,
 } from "../types";
+
+function normalizePayResult(
+  raw: Partial<StartOnlinePaymentResult> | null | undefined,
+  fallbackOrderId: string
+): StartOnlinePaymentResult {
+  const mode = raw?.mode === "embedded" ? "embedded" : "redirect";
+  return {
+    mode,
+    paymentUrl: raw?.paymentUrl ?? null,
+    invoiceId: raw?.invoiceId ?? null,
+    form: raw?.form ?? null,
+    orderId: raw?.orderId || fallbackOrderId,
+  };
+}
 
 export const ordersApi = {
   // --- Customer ---
@@ -49,28 +65,68 @@ export const ordersApi = {
     return data.data;
   },
 
-  // Start online payment for a PENDING_PAYMENT order whose paymentMethod is MYFATOORAH.
-  // Returns the MyFatoorah hosted-page URL — redirect the browser there; Apple Pay shows
-  // on iPhone/Safari, cards everywhere. The backend re-verifies server-side on return.
+  /** Publishable key + CDN for the checkout-inline Moyasar form (no secret). */
+  async getMoyasarFormConfig(): Promise<MoyasarFormBootstrap> {
+    const { data } = await http.get<ApiResponse<MoyasarFormBootstrap>>(
+      "/orders/payment/moyasar/form-config"
+    );
+    return data.data;
+  },
+
+  // Start online payment for a PENDING_PAYMENT order (MYFATOORAH / MOYASAR).
+  // MyFatoorah → mode=redirect + paymentUrl. Moyasar → mode=embedded + form config
+  // (card form mounts inline on checkout — customer stays on our site).
   async pay(
     id: string,
-    opts: { returnUrl?: string } = {}
-  ): Promise<{ paymentUrl: string; invoiceId: string | null }> {
-    const { data } = await http.post<
-      ApiResponse<{ paymentUrl: string; invoiceId: string | null }>
-    >(`/orders/${id}/pay`, opts.returnUrl ? { returnUrl: opts.returnUrl } : {});
-    return data.data;
+    opts: { returnUrl?: string; lang?: "en" | "ar" } = {}
+  ): Promise<StartOnlinePaymentResult> {
+    const body: { returnUrl?: string; lang?: "en" | "ar" } = {};
+    if (opts.returnUrl) body.returnUrl = opts.returnUrl;
+    if (opts.lang) body.lang = opts.lang;
+    const { data } = await http.post<ApiResponse<StartOnlinePaymentResult>>(
+      `/orders/${id}/pay`,
+      body
+    );
+    return normalizePayResult(data.data, id);
   },
 
   // Start online payment for a GUEST order (no login). Public endpoint — resolves the order
   // by id where it has no owner. Same shape as pay(); used by the guest checkout flow.
   async guestPay(
     id: string,
-    opts: { returnUrl?: string } = {}
-  ): Promise<{ paymentUrl: string; invoiceId: string | null }> {
+    opts: { returnUrl?: string; lang?: "en" | "ar" } = {}
+  ): Promise<StartOnlinePaymentResult> {
+    const body: { returnUrl?: string; lang?: "en" | "ar" } = {};
+    if (opts.returnUrl) body.returnUrl = opts.returnUrl;
+    if (opts.lang) body.lang = opts.lang;
+    const { data } = await http.post<ApiResponse<StartOnlinePaymentResult>>(
+      `/orders/${id}/guest-pay`,
+      body
+    );
+    return normalizePayResult(data.data, id);
+  },
+
+  /** Persist Moyasar payment id from embedded form on_completed (authenticated). */
+  async attachMoyasarPayment(orderId: string, paymentId: string): Promise<void> {
+    await http.post(`/orders/${orderId}/moyasar/attach`, { paymentId });
+  },
+
+  /** Persist Moyasar payment id for a guest order. */
+  async attachMoyasarGuestPayment(orderId: string, paymentId: string): Promise<void> {
+    await http.post(`/orders/${orderId}/moyasar/guest-attach`, { paymentId });
+  },
+
+  /**
+   * Re-verify a Moyasar payment after the form redirects back to our return page.
+   * Never trust query-string status alone.
+   */
+  async confirmMoyasarPayment(opts: {
+    paymentId?: string;
+    orderId?: string;
+  }): Promise<{ isPaid: boolean; orderId: string | null; status: string | null }> {
     const { data } = await http.post<
-      ApiResponse<{ paymentUrl: string; invoiceId: string | null }>
-    >(`/orders/${id}/guest-pay`, opts.returnUrl ? { returnUrl: opts.returnUrl } : {});
+      ApiResponse<{ isPaid: boolean; orderId: string | null; status: string | null }>
+    >(`/orders/payment/moyasar/confirm`, opts);
     return data.data;
   },
 
