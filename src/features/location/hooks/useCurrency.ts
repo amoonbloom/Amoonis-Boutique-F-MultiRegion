@@ -62,7 +62,9 @@ export function useCurrency() {
     // Defaults are conservative: no online payment until the region is confirmed, but
     // both methods on once it is (matches the backend column defaults).
     onlinePaymentEnabled: region?.onlinePaymentEnabled ?? false,
+    onlinePaymentProvider: region?.onlinePaymentProvider ?? null,
     applePayEnabled: region?.applePayEnabled ?? true,
     cardPaymentEnabled: region?.cardPaymentEnabled ?? true,
+    shortAddressEnabled: region?.shortAddressEnabled ?? false,
   };
 }

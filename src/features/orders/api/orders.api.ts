@@ -4,6 +4,7 @@ import type { ApiResponse, PaginatedResponse } from "@/types";
 import type {
   ApiAdminOrderHistoryParams,
   ApiCheckoutInput,
+  ApiExpressCheckoutInput,
   ApiGuestCheckoutInput,
   ApiOrder,
   ApiOrderExportParams,
@@ -45,6 +46,16 @@ export const ordersApi = {
   async guestCheckout(payload: ApiGuestCheckoutInput): Promise<ApiOrder> {
     const { data } = await http.post<ApiResponse<ApiOrder>>(
       "/orders/guest-checkout",
+      payload
+    );
+    return data.data;
+  },
+
+  /** PDP Apple Pay express — creates an order without touching the cart. Sends
+   *  the auth token when present (http interceptor) so the order is linked. */
+  async expressCheckout(payload: ApiExpressCheckoutInput): Promise<ApiOrder> {
+    const { data } = await http.post<ApiResponse<ApiOrder>>(
+      "/orders/express-checkout",
       payload
     );
     return data.data;

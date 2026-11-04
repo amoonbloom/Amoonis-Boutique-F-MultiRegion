@@ -14,11 +14,13 @@ import { GiftCardModal, type GiftCardEntry } from "./GiftCardModal";
 import { CustomNameModal, type CustomNameEntry } from "./CustomNameModal";
 import { CashArrangementModal, type CashUnitEntry } from "./CashArrangementModal";
 import { usePdpImage, type PdpAddResult } from "./PdpImageContext";
+import { PdpApplePayExpress } from "./PdpApplePayExpress";
 import { useCart } from "@/features/cart/hooks/useCart";
 import { useCurrency } from "@/features/location/hooks/useCurrency";
 import { formatCurrency } from "@/lib/format";
 import { cashArrangementApi } from "@/features/cash-arrangement/api/cash-arrangement.api";
 import { computeCashArrangementFee } from "@/features/cash-arrangement/cashArrangementFee";
+import type { ApiGuestCheckoutItem } from "@/features/orders/types";
 import { queryKeys } from "@/services/queryKeys";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { pushToast, toggleCartDrawer } from "@/store/slices/ui.slice";
@@ -90,18 +92,22 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
   const [customNameSelected, setCustomNameSelected] = useState(false);
   const [customNames, setCustomNames] = useState<CustomNameEntry[]>([]);
   const [customNameModalOpen, setCustomNameModalOpen] = useState(false);
-  // Which step of the "Add to cart" confirmation chain is currently open (if any).
-  // Drives onGiftSave/onCustomNameSave/onCashSave: only advance the chain (or
-  // actually add to cart) when a modal's Save/Cancel fires AS PART OF that chain —
-  // a Save/Cancel from the standalone "Edit" button (addStep === "idle") just
-  // records the entries.
+  // Which step of the personalization confirmation chain is currently open (if any).
+  // Shared by Add to cart and Apple Pay express — only advance / finish when a
+  // modal's Save/Cancel fires AS PART OF that chain. A Save/Cancel from the
+  // standalone "Edit" button (addStep === "idle") just records the entries.
   const [addStep, setAddStep] = useState<"idle" | "gift" | "customName" | "cash">("idle");
-  // Resolves the in-flight startAddFlow() promise once the chain finishes (added,
-  // or the shopper cancelled a step) — lets the mobile sticky bar's requestAdd()
+  // "cart" → handleAdd; "express" → open Apple Pay sheet with finalized unit configs.
+  const flowModeRef = useRef<"cart" | "express">("cart");
+  // Resolves the in-flight personalization promise once the chain finishes (added,
+  // express opened, or cancelled) — lets the mobile sticky bar's requestAdd()
   // await the SAME multi-step confirmation instead of racing ahead of it.
   const pendingAddResolveRef = useRef<
     ((result: PdpAddResult | PromiseLike<PdpAddResult>) => void) | null
   >(null);
+  const [expressOpen, setExpressOpen] = useState(false);
+  const [expressItems, setExpressItems] = useState<ApiGuestCheckoutItem[]>([]);
+  const [expressPreviewAmount, setExpressPreviewAmount] = useState(0);
 
   // Cash arrangement add-on: opted into with an inline Yes/No that opens a modal collecting
   // ONE cash arrangement per unit (see CashArrangementModal), so a shopper buying several can
@@ -153,8 +159,8 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
     if (addStep !== "cash") return; // opened via the standalone "Edit" button — just save
     setAddStep("idle");
     // Cash arrangement is always the LAST step of the chain (gift card / custom name,
-    // if any, already ran and committed a render ago) — perform the add.
-    settleAddFlow(handleAdd({ cashEntries: nextCashEntries }));
+    // if any, already ran and committed a render ago) — finish cart or express.
+    settleAddFlow(finishPersonalizationChain({ cashEntries: nextCashEntries }));
   };
   const includedCashCount = cashEntries.filter((e) => e.included && Number(e.cashAmount) > 0).length;
   // Both feed the price-preview section below so the fee is visible on the product page
@@ -227,7 +233,7 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
       setCashModalOpen(true);
     } else {
       setAddStep("idle");
-      settleAddFlow(handleAdd({ giftCards: nextGiftCards }));
+      settleAddFlow(finishPersonalizationChain({ giftCards: nextGiftCards }));
     }
   };
   const includedCardCount = giftCards.filter((e) => e.included).length;
@@ -260,8 +266,8 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
     } else {
       setAddStep("idle");
       // Gift card, if any, ran first and its entries already committed a render
-      // ago — perform the add.
-      settleAddFlow(handleAdd({ customNames: nextCustomNames }));
+      // ago — finish cart or express.
+      settleAddFlow(finishPersonalizationChain({ customNames: nextCustomNames }));
     }
   };
   const includedNameCount = customNames.filter((e) => e.included && e.name.trim()).length;
@@ -303,28 +309,19 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
     addedTimer.current = setTimeout(() => setJustAdded(false), 1600);
   };
 
-  // `overrides` carries a step's just-saved entries when handleAdd is invoked in
-  // the SAME event-handler tick as setGiftCards/setCustomNames (that state hasn't
-  // rendered yet, so reading it from the closure would see the stale array) — see
-  // onGiftSave/onCustomNameSave. Any step that already committed in an EARLIER
-  // tick (there's a full render between chain steps) is safely read from state.
-  const handleAdd = async (overrides?: {
+  type PersonalizationOverrides = {
     giftCards?: GiftCardEntry[];
     customNames?: CustomNameEntry[];
     cashEntries?: CashUnitEntry[];
-  }): Promise<PdpAddResult> => {
-    if (!product.inStock || product.comingSoon) return { ok: false };
-    const { selectedByTitle, variantImage } = buildSelection();
+  };
+
+  // One config per unit — shared by cart add and Apple Pay express so personalization
+  // never drifts between the two paths.
+  const buildUnitConfigs = (overrides?: PersonalizationOverrides): UnitConfig[] => {
     const effectiveGiftCards = overrides?.giftCards ?? giftCards;
     const effectiveCustomNames = overrides?.customNames ?? customNames;
     const effectiveCashEntries = overrides?.cashEntries ?? cashEntries;
-
-    // One config per unit: each unit's own gift card (message, or none), its own custom
-    // name (or none), and its own cash arrangement (amount/denom/note, or none). A unit
-    // past the saved entries (qty raised afterwards) gets a sensible default — though in
-    // practice startAddFlow always re-opens the cash modal first when cashEnabled, so
-    // effectiveCashEntries is already re-seeded to `qty` length by the time this runs.
-    const units: UnitConfig[] = Array.from({ length: qty }, (_, i) => {
+    return Array.from({ length: qty }, (_, i) => {
       const entry = giftCard ? effectiveGiftCards[i] ?? { included: true, message: "" } : undefined;
       const hasCard = !!entry?.included;
       const nameEntry = customNameSelected ? effectiveCustomNames[i] : undefined;
@@ -342,10 +339,9 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
         cashArrangement,
       };
     });
+  };
 
-    // Group identical unit configs so the same personalization becomes one line of the right
-    // quantity; distinct ones (different messages, card vs no card, or DIFFERENT cash) stay
-    // separate lines.
+  const groupUnitConfigs = (units: UnitConfig[]) => {
     const groups = new Map<string, { unit: UnitConfig; count: number }>();
     for (const u of units) {
       const cashKey = u.cashArrangement
@@ -356,6 +352,18 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
       if (g) g.count += 1;
       else groups.set(key, { unit: u, count: 1 });
     }
+    return groups;
+  };
+
+  // `overrides` carries a step's just-saved entries when handleAdd is invoked in
+  // the SAME event-handler tick as setGiftCards/setCustomNames (that state hasn't
+  // rendered yet, so reading it from the closure would see the stale array) — see
+  // onGiftSave/onCustomNameSave. Any step that already committed in an EARLIER
+  // tick (there's a full render between chain steps) is safely read from state.
+  const handleAdd = async (overrides?: PersonalizationOverrides): Promise<PdpAddResult> => {
+    if (!product.inStock || product.comingSoon) return { ok: false };
+    const { selectedByTitle, variantImage } = buildSelection();
+    const groups = groupUnitConfigs(buildUnitConfigs(overrides));
 
     let anyOk = false;
     // Sequential so the first add creates the server cart row before the rest fire.
@@ -374,20 +382,71 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
     return { ok: true };
   };
 
-  // Entry point for the "Add to cart" button (and the mobile sticky bar, via
-  // requestAdd). If any add-on is turned on, walks the shopper through its modal
-  // FIRST — Gift card, then Custom name, then Cash arrangement — so what they
-  // confirm always matches the quantity on screen right now (this is what fixes
-  // "raise qty to 2 after configuring cash for 1 and the 2nd unit silently gets
-  // no cash arrangement" — cashNeedsConfirmation re-opens the modal, pre-seeded
-  // for the current qty, whenever it was raised past the last saved entries).
-  // Gift card / custom name have no such qty-aware skip since re-seeding them per
-  // unit is comparatively cheap and their modals are quick — cash is the one add-on
-  // heavy enough (fee calc, denominations) that reopening it for no reason, on
-  // every single add-to-cart click, would be an annoyance. Only resolves once the
-  // whole chain settles (added, or aborted by a cancel).
-  const startAddFlow = (): Promise<PdpAddResult> => {
+  /** Build express-checkout line items + preview amount from finalized unit configs. */
+  const buildExpressPayload = (overrides?: PersonalizationOverrides) => {
+    const { selectedByTitle } = buildSelection();
+    const units = buildUnitConfigs(overrides);
+    const groups = groupUnitConfigs(units);
+    const items: ApiGuestCheckoutItem[] = [];
+    let customNameCount = 0;
+    let cashSum = 0;
+    let cashFeeSum = 0;
+    for (const { unit, count } of groups.values()) {
+      items.push({
+        productId: product.id,
+        quantity: count,
+        message: unit.message,
+        selectedOptions: selectedByTitle,
+        giftCardSelected: unit.giftCardSelected,
+        customName: unit.customName,
+        cashArrangement: unit.cashArrangement
+          ? {
+              cashAmount: unit.cashArrangement.cashAmount,
+              denomination: unit.cashArrangement.denomination ?? undefined,
+              note: unit.cashArrangement.note || undefined,
+            }
+          : undefined,
+      });
+      if (unit.customName) customNameCount += count;
+      if (unit.cashArrangement) {
+        cashSum += unit.cashArrangement.cashAmount * count;
+        if (cashConfig?.feeStepAmount != null && cashConfig?.feeMarginPercent != null) {
+          cashFeeSum +=
+            computeCashArrangementFee(unit.cashArrangement.cashAmount, {
+              feeStepAmount: cashConfig.feeStepAmount,
+              feeMarginPercent: cashConfig.feeMarginPercent,
+            }) * count;
+        }
+      }
+    }
+    const customNameTotal = (product.customNamePrice ?? 0) * customNameCount;
+    const previewAmount = unitPrice * qty + customNameTotal + cashSum + cashFeeSum;
+    return { items, previewAmount };
+  };
+
+  const openExpressSheet = (overrides?: PersonalizationOverrides): PdpAddResult => {
+    const payload = buildExpressPayload(overrides);
+    if (payload.items.length === 0) return { ok: false };
+    setExpressItems(payload.items);
+    setExpressPreviewAmount(payload.previewAmount);
+    setExpressOpen(true);
+    return { ok: true };
+  };
+
+  const finishPersonalizationChain = (
+    overrides?: PersonalizationOverrides
+  ): PdpAddResult | Promise<PdpAddResult> => {
+    if (flowModeRef.current === "express") {
+      return openExpressSheet(overrides);
+    }
+    return handleAdd(overrides);
+  };
+
+  // Shared personalization walk (gift → custom name → cash) used by Add to cart
+  // and Apple Pay express. Mode decides what finishPersonalizationChain does.
+  const runPersonalizationChain = (mode: "cart" | "express"): Promise<PdpAddResult> => {
     if (!product.inStock || product.comingSoon) return Promise.resolve({ ok: false });
+    flowModeRef.current = mode;
     return new Promise<PdpAddResult>((resolve) => {
       pendingAddResolveRef.current = resolve;
       if (giftCard) {
@@ -401,10 +460,27 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
         setCashModalOpen(true);
       } else {
         pendingAddResolveRef.current = null;
-        resolve(handleAdd());
+        resolve(finishPersonalizationChain());
       }
     });
   };
+
+  // Entry point for the "Add to cart" button (and the mobile sticky bar, via
+  // requestAdd). If any add-on is turned on, walks the shopper through its modal
+  // FIRST — Gift card, then Custom name, then Cash arrangement — so what they
+  // confirm always matches the quantity on screen right now (this is what fixes
+  // "raise qty to 2 after configuring cash for 1 and the 2nd unit silently gets
+  // no cash arrangement" — cashNeedsConfirmation re-opens the modal, pre-seeded
+  // for the current qty, whenever it was raised past the last saved entries).
+  // Gift card / custom name have no such qty-aware skip since re-seeding them per
+  // unit is comparatively cheap and their modals are quick — cash is the one add-on
+  // heavy enough (fee calc, denominations) that reopening it for no reason, on
+  // every single add-to-cart click, would be an annoyance. Only resolves once the
+  // whole chain settles (added, or aborted by a cancel).
+  const startAddFlow = (): Promise<PdpAddResult> => runPersonalizationChain("cart");
+
+  /** Same personalization chain as add-to-cart, then opens the Apple Pay sheet. */
+  const startExpressFlow = (): Promise<PdpAddResult> => runPersonalizationChain("express");
 
   // Expose this panel's add handler to the shared PDP context via a stable wrapper
   // that always calls the latest `startAddFlow` (which closes over the current
@@ -628,6 +704,18 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
       {product.comingSoon && (
         <p className="mt-2 text-sm text-ink-500">{t("common.comingSoonNote")}</p>
       )}
+
+      <PdpApplePayExpress
+        product={product}
+        items={expressItems}
+        previewAmount={expressPreviewAmount}
+        open={expressOpen}
+        onClose={() => setExpressOpen(false)}
+        personalizationBusy={addStep !== "idle"}
+        onRequestOpen={() => {
+          void startExpressFlow();
+        }}
+      />
 
       <Button
         fullWidth

@@ -92,7 +92,12 @@ export interface OrderShippingAddress {
 export interface OrderShippingAddressInput {
   fullName: string;
   phone: string;
+  /** Neighborhood / community. Softened on express-checkout when omitted. */
   area: string;
+  streetAddress?: string;
+  /** Selected delivery city (e.g. Riyadh) for express Apple Pay shipping. */
+  city?: string;
+  country?: string;
   deliveryZoneId?: string;
 }
 
@@ -358,6 +363,9 @@ export interface ApiGuestCheckoutInput {
   paymentMethod?: PaymentMethod;
   // Cash arrangement is per-item — see ApiGuestCheckoutItem.cashArrangement.
 }
+
+/** Body for `POST /orders/express-checkout` (PDP Apple Pay — optionalAuth, no cart). */
+export type ApiExpressCheckoutInput = ApiGuestCheckoutInput;
 
 export interface ApiOrderHistoryParams {
   page?: number;
