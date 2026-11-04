@@ -77,6 +77,10 @@ type PendingExpressOrder = {
   orderNumber: number | null;
 };
 
+type MoyasarBootstrap = NonNullable<
+  Awaited<ReturnType<typeof ordersApi.getMoyasarFormConfig>>
+>;
+
 function getApplePaySession(): ApplePaySessionCtor | undefined {
   if (typeof window === "undefined") return undefined;
   return (window as Window & { ApplePaySession?: ApplePaySessionCtor }).ApplePaySession;
@@ -188,6 +192,7 @@ function NativeApplePayButton({
     if (!host || disabled) return;
     const btn = host.querySelector("apple-pay-button");
     if (!btn) return;
+    // Must stay synchronous — ApplePaySession must be created inside this gesture.
     const handler = (e: Event) => {
       e.preventDefault();
       onPayRef.current();
@@ -204,7 +209,6 @@ function NativeApplePayButton({
         opacity: disabled ? 0.5 : 1,
         pointerEvents: disabled ? "none" : "auto",
       }}
-      // Custom element rendered via innerHTML-equivalent JSX child for Apple's CDN.
       dangerouslySetInnerHTML={{
         __html: `<apple-pay-button buttonstyle="black" type="plain" locale="${locale}" style="display:block;width:100%;height:56px;--apple-pay-button-width:100%;--apple-pay-button-height:56px;--apple-pay-button-border-radius:16px;--apple-pay-button-box-sizing:border-box;"></apple-pay-button>`,
       }}
@@ -229,7 +233,7 @@ export type PdpApplePayExpressProps = {
 export function PdpApplePayExpress({
   product,
   items,
-  previewAmount: _previewAmount,
+  previewAmount,
   open,
   onClose,
   personalizationBusy = false,
@@ -264,9 +268,12 @@ export function PdpApplePayExpress({
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [appleOk, setAppleOk] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [orderReady, setOrderReady] = useState(false);
+  const [preparingOrder, setPreparingOrder] = useState(false);
   const [hasApplePayButton, setHasApplePayButton] = useState(false);
   const pendingOrderRef = useRef<PendingExpressOrder | null>(null);
   const sessionBusyRef = useRef(false);
+  const prepareGenRef = useRef(0);
 
   const zonesQuery = useQuery({
     queryKey: queryKeys.deliveryZones.list(countryCode),
@@ -293,12 +300,20 @@ export function PdpApplePayExpress({
     setAppleOk(applePaySupported());
     setFieldError(null);
     setPaying(false);
+    setOrderReady(false);
+    setPreparingOrder(false);
     pendingOrderRef.current = null;
     sessionBusyRef.current = false;
     void loadApplePaySdk()
       .then((ready) => setHasApplePayButton(ready))
       .catch(() => setHasApplePayButton(false));
   }, [open]);
+
+  // Changing line items / address means the pre-created order is stale.
+  useEffect(() => {
+    pendingOrderRef.current = null;
+    setOrderReady(false);
+  }, [items, shortAddress, streetAddress, selectedCity, deliveryZoneId, countryCode]);
 
   const validateSheetFields = useCallback((): string | null => {
     if (shortAddressEnabled) {
@@ -401,7 +416,63 @@ export function PdpApplePayExpress({
     currency,
   ]);
 
-  const startApplePay = useCallback(async () => {
+  // Pre-create the order once sheet fields are valid so the Apple Pay click
+  // handler can construct ApplePaySession synchronously (Safari requirement).
+  useEffect(() => {
+    if (!open || !gated || !appleOk) return;
+    if (validateSheetFields() != null) {
+      setPreparingOrder(false);
+      setOrderReady(false);
+      return;
+    }
+    if (pendingOrderRef.current) {
+      setOrderReady(true);
+      setPreparingOrder(false);
+      return;
+    }
+
+    const gen = ++prepareGenRef.current;
+    setPreparingOrder(true);
+    setOrderReady(false);
+    void ensureExpressOrder()
+      .then(() => {
+        if (prepareGenRef.current !== gen) return;
+        setOrderReady(true);
+        setPreparingOrder(false);
+        setFieldError(null);
+      })
+      .catch((e) => {
+        if (prepareGenRef.current !== gen) return;
+        setPreparingOrder(false);
+        setOrderReady(false);
+        const message =
+          e instanceof ApiError
+            ? e.message
+            : e instanceof Error
+              ? e.message
+              : t("checkout.orderFailed");
+        failToast(message);
+      });
+  }, [
+    open,
+    gated,
+    appleOk,
+    validateSheetFields,
+    ensureExpressOrder,
+    failToast,
+    t,
+    items,
+    shortAddress,
+    streetAddress,
+    selectedCity,
+    deliveryZoneId,
+  ]);
+
+  /**
+   * CRITICAL: Apple requires `new ApplePaySession(...)` inside the user-gesture
+   * handler with NO await beforehand. Order must already exist in pendingOrderRef.
+   */
+  const startApplePay = useCallback(() => {
     if (sessionBusyRef.current || paying) return;
 
     const err = validateSheetFields();
@@ -411,31 +482,24 @@ export function PdpApplePayExpress({
     }
 
     const AP = getApplePaySession();
-    const bootstrap = moyasarFormQuery.data;
+    const bootstrap = moyasarFormQuery.data as MoyasarBootstrap | undefined;
+    const orderSnap = pendingOrderRef.current;
     if (!AP || !applePaySupported() || !bootstrap) {
       failToast(t("product.applePayUnsupported"));
+      return;
+    }
+    if (!orderSnap) {
+      // Still preparing — kick another prepare and ask the shopper to tap again.
+      void ensureExpressOrder()
+        .then(() => setOrderReady(true))
+        .catch(() => undefined);
+      failToast(t("checkout.moyasarFormLoading"));
       return;
     }
 
     setFieldError(null);
     setPaying(true);
     sessionBusyRef.current = true;
-
-    let orderSnap: PendingExpressOrder;
-    try {
-      orderSnap = await ensureExpressOrder();
-    } catch (e) {
-      sessionBusyRef.current = false;
-      setPaying(false);
-      const message =
-        e instanceof ApiError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : t("checkout.orderFailed");
-      failToast(message);
-      return;
-    }
 
     const version =
       typeof AP.supportsVersion === "function" && AP.supportsVersion(7) ? 7 : 6;
@@ -455,6 +519,7 @@ export function PdpApplePayExpress({
 
     let session: ApplePaySessionInstance;
     try {
+      // Must stay synchronous — this is the user-gesture boundary Safari enforces.
       session = new AP(version, paymentRequest);
     } catch (e) {
       sessionBusyRef.current = false;
@@ -643,10 +708,15 @@ export function PdpApplePayExpress({
   const bootstrap = moyasarFormQuery.data;
   const ctaDisabled = personalizationBusy || !product.inStock || product.comingSoon;
   const payDisabled =
-    paying || !appleOk || !bootstrap || moyasarFormQuery.isLoading;
+    paying ||
+    preparingOrder ||
+    !orderReady ||
+    !appleOk ||
+    !bootstrap ||
+    moyasarFormQuery.isLoading;
 
-  // Keep previewAmount in the public props API (AddToCartPanel still passes it).
-  void _previewAmount;
+  // previewAmount kept on the public props API (AddToCartPanel still passes it).
+  void previewAmount;
 
   return (
     <>
@@ -717,18 +787,22 @@ export function PdpApplePayExpress({
             </p>
           ) : null}
 
-          {appleOk && bootstrap ? (
+          {appleOk && preparingOrder ? (
+            <p className="text-sm text-ink-500">{t("checkout.moyasarFormLoading")}</p>
+          ) : null}
+
+          {appleOk && bootstrap && !preparingOrder ? (
             hasApplePayButton ? (
               <NativeApplePayButton
                 disabled={payDisabled}
                 locale={appLocale === "ar" ? "ar-SA" : "en-US"}
-                onPay={() => void startApplePay()}
+                onPay={startApplePay}
               />
             ) : (
               <button
                 type="button"
                 disabled={payDisabled}
-                onClick={() => void startApplePay()}
+                onClick={startApplePay}
                 className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-black px-8 text-base font-medium text-white transition hover:bg-ink-900 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={t("product.applePayCta")}
               >
