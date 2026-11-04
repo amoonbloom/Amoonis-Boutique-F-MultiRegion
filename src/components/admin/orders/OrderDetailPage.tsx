@@ -352,7 +352,8 @@ export function OrderDetailPage({ id }: { id: string }) {
                 ? t("admin.orderDetailPage.codLabel")
                 : order.paymentMethod === "TABBY"
                   ? t("checkout.payTabby")
-                  : order.paymentMethod === "MYFATOORAH"
+                  : order.paymentMethod === "MYFATOORAH" ||
+                      order.paymentMethod === "MOYASAR"
                     ? t("checkout.payCard")
                     : order.paymentMethod}
             </p>

@@ -101,6 +101,7 @@ export function RegionForm({
       sameDayCutoff: z.string(),
       codEnabled: z.boolean(),
       onlinePaymentEnabled: z.boolean(),
+      onlinePaymentProvider: z.enum(["MYFATOORAH", "MOYASAR"]),
       applePayEnabled: z.boolean(),
       cardPaymentEnabled: z.boolean(),
       shortAddressEnabled: z.boolean(),
@@ -184,6 +185,7 @@ export function RegionForm({
       sameDayCutoff: "",
       codEnabled: true,
       onlinePaymentEnabled: false,
+      onlinePaymentProvider: "MYFATOORAH",
       applePayEnabled: true,
       cardPaymentEnabled: true,
       shortAddressEnabled: false,
@@ -269,6 +271,7 @@ export function RegionForm({
       sameDayCutoff: initial.sameDayCutoff ?? "",
       codEnabled: initial.codEnabled ?? true,
       onlinePaymentEnabled: initial.onlinePaymentEnabled ?? false,
+      onlinePaymentProvider: initial.onlinePaymentProvider ?? "MYFATOORAH",
       applePayEnabled: initial.applePayEnabled ?? true,
       cardPaymentEnabled: initial.cardPaymentEnabled ?? true,
       shortAddressEnabled: initial.shortAddressEnabled ?? false,
@@ -317,6 +320,7 @@ export function RegionForm({
       sameDayCutoff: v.sameDayCutoff?.trim() ? v.sameDayCutoff.trim() : null,
       codEnabled: v.codEnabled,
       onlinePaymentEnabled: v.onlinePaymentEnabled,
+      onlinePaymentProvider: v.onlinePaymentProvider,
       applePayEnabled: v.applePayEnabled,
       cardPaymentEnabled: v.cardPaymentEnabled,
       shortAddressEnabled: v.shortAddressEnabled,
@@ -561,7 +565,25 @@ export function RegionForm({
                   onlinePaymentEnabled ? "" : "pointer-events-none opacity-50"
                 }`}
               >
-                <label className="flex cursor-pointer items-center gap-3">
+                <label className="mt-1 block text-sm font-medium text-ink-900">
+                  {t("admin.regionForm.onlinePaymentProviderLabel")}
+                </label>
+                <select
+                  {...register("onlinePaymentProvider")}
+                  disabled={!onlinePaymentEnabled}
+                  className="mt-1 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 disabled:opacity-50"
+                >
+                  <option value="MYFATOORAH">
+                    {t("admin.regionForm.onlinePaymentProviderMyFatoorah")}
+                  </option>
+                  <option value="MOYASAR">
+                    {t("admin.regionForm.onlinePaymentProviderMoyasar")}
+                  </option>
+                </select>
+                <p className="mt-1 text-xs text-ink-500">
+                  {t("admin.regionForm.onlinePaymentProviderHint")}
+                </p>
+                <label className="mt-3 flex cursor-pointer items-center gap-3">
                   <input
                     type="checkbox"
                     {...register("applePayEnabled")}

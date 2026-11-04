@@ -50,6 +50,10 @@ import {
 } from "./CashArrangementSummary";
 import { TabbyLogo } from "./TabbyLogo";
 import { TabbyCheckoutCard } from "./TabbyCheckoutCard";
+import {
+  MoyasarPayForm,
+  type MoyasarInitiatingResult,
+} from "./MoyasarPayForm";
 import { getTabbySnippetConfig } from "@/config/tabbyPublic";
 import { regionsApi } from "@/features/regions/api/regions.api";
 import { deliveryZonesApi } from "@/features/delivery-zones/api/delivery-zones.api";
@@ -435,21 +439,37 @@ export function CheckoutClient() {
   const belowMinOrder = minOrderAmount != null && subtotal < minOrderAmount;
   const aboveMaxOrder = maxOrderAmount != null && subtotal > maxOrderAmount;
 
-  // MyFatoorah (card / Apple Pay) — region onlinePaymentEnabled + at least one method.
-  const myFatoorahAvailable =
+  // Card / Apple Pay — region onlinePaymentEnabled + at least one method.
+  // Gateway is MyFatoorah or Moyasar per Region.onlinePaymentProvider (admin).
+  const cardOnlineAvailable =
     Boolean(currentRegion?.onlinePaymentEnabled) &&
     (Boolean(currentRegion?.applePayEnabled) || Boolean(currentRegion?.cardPaymentEnabled));
-  // Tabby Pay-in-4 — independent region toggle (does not require MyFatoorah online payment).
+  const cardOnlineMethod: "MYFATOORAH" | "MOYASAR" =
+    currentRegion?.onlinePaymentProvider === "MOYASAR" ? "MOYASAR" : "MYFATOORAH";
+  // Legacy alias kept for prop names / nested components.
+  const myFatoorahAvailable = cardOnlineAvailable;
+  // Tabby Pay-in-4 — independent region toggle (does not require card online payment).
   const tabbyAvailable = Boolean(currentRegion?.tabbyEnabled);
   // Any redirect-based online method (legacy name kept for prop wiring below).
-  const onlinePayAvailable = myFatoorahAvailable || tabbyAvailable;
-  const [paymentMethod, setPaymentMethod] = useState<"COD" | "MYFATOORAH" | "TABBY">("COD");
+  const onlinePayAvailable = cardOnlineAvailable || tabbyAvailable;
+  const [paymentMethod, setPaymentMethod] = useState<
+    "COD" | "MYFATOORAH" | "MOYASAR" | "TABBY"
+  >("COD");
+  // Moyasar regions: default to the always-visible card form unless the customer
+  // explicitly picks Tabby / COD (tracked so we don't fight their choice).
+  const paymentTouchedRef = useRef(false);
+  const selectPaymentMethod = (
+    method: "COD" | "MYFATOORAH" | "MOYASAR" | "TABBY"
+  ) => {
+    paymentTouchedRef.current = true;
+    setPaymentMethod(method);
+  };
   // After Tabby rejects a session, block further Place-order clicks until the cart,
   // phone, or email changes (or the page reloads) — Tabby QA requirement.
   const [tabbyRejected, setTabbyRejected] = useState(false);
-  const payingOnline =
-    (paymentMethod === "MYFATOORAH" && myFatoorahAvailable) ||
-    (paymentMethod === "TABBY" && tabbyAvailable);
+  const payingCardOnline =
+    (paymentMethod === "MYFATOORAH" || paymentMethod === "MOYASAR") && cardOnlineAvailable;
+  const payingOnline = payingCardOnline || (paymentMethod === "TABBY" && tabbyAvailable);
 
   // COD unavailability only blocks a COD order — an online payment is unaffected by it.
   const placeOrderBlocked =
@@ -458,17 +478,39 @@ export function CheckoutClient() {
     aboveMaxOrder ||
     (paymentMethod === "TABBY" && tabbyRejected);
 
-  // Keep the selected method valid as region / COD availability changes.
+  // Keep the selected method valid as region / COD / provider changes.
   useEffect(() => {
-    if (paymentMethod === "MYFATOORAH" && !myFatoorahAvailable) {
+    if (
+      (paymentMethod === "MYFATOORAH" || paymentMethod === "MOYASAR") &&
+      !cardOnlineAvailable
+    ) {
       setPaymentMethod(tabbyAvailable ? "TABBY" : "COD");
+    } else if (
+      (paymentMethod === "MYFATOORAH" || paymentMethod === "MOYASAR") &&
+      paymentMethod !== cardOnlineMethod
+    ) {
+      setPaymentMethod(cardOnlineMethod);
     } else if (paymentMethod === "TABBY" && !tabbyAvailable) {
-      setPaymentMethod(myFatoorahAvailable ? "MYFATOORAH" : "COD");
+      setPaymentMethod(cardOnlineAvailable ? cardOnlineMethod : "COD");
     } else if (paymentMethod === "COD" && codUnavailable) {
-      if (myFatoorahAvailable) setPaymentMethod("MYFATOORAH");
+      if (cardOnlineAvailable) setPaymentMethod(cardOnlineMethod);
       else if (tabbyAvailable) setPaymentMethod("TABBY");
+    } else if (
+      !paymentTouchedRef.current &&
+      paymentMethod === "COD" &&
+      cardOnlineAvailable &&
+      cardOnlineMethod === "MOYASAR"
+    ) {
+      // Moyasar: card form is always on the page — default to it (no "Pay online" radio).
+      setPaymentMethod("MOYASAR");
     }
-  }, [myFatoorahAvailable, tabbyAvailable, codUnavailable, paymentMethod]);
+  }, [
+    cardOnlineAvailable,
+    cardOnlineMethod,
+    tabbyAvailable,
+    codUnavailable,
+    paymentMethod,
+  ]);
 
   const watchedPhone = watchNewAddr("phone");
   const watchedEmail = watchNewAddr("email");
@@ -620,163 +662,252 @@ export function CheckoutClient() {
     }
   };
 
-  const placeOrderMutation = useMutation({
-    mutationFn: async () => {
-      if (deliveryType === "SCHEDULED" && !scheduledDeliveryAt) {
-        throw new Error(t("checkout.chooseDeliveryDateError"));
-      }
-      // Delivery-config gates (backend re-validates all of these authoritatively).
-      // COD unavailability only blocks a COD order — an online payment is unaffected.
-      if (!payingOnline && codUnavailable) throw new Error(t("checkout.codUnavailable"));
-      if (belowMinOrder) {
-        throw new Error(
-          t("checkout.minOrderError", {
-            amount: formatCurrency(minOrderAmount!, currency, locale),
-          })
-        );
-      }
-      if (aboveMaxOrder) {
-        throw new Error(
-          t("checkout.maxOrderError", {
-            amount: formatCurrency(maxOrderAmount!, currency, locale),
-          })
-        );
-      }
-      // Only a date is collected (no time-of-day input) — pin it to noon UTC so the
-      // resulting instant safely sits within the same calendar day in any timezone
-      // the backend's BUSINESS_TIMEZONE day-boundary check might use, rather than
-      // relying on implicit UTC-midnight parsing of a bare "YYYY-MM-DD" string.
-      const scheduledDeliveryAtIso =
-        deliveryType === "SCHEDULED"
-          ? new Date(`${scheduledDeliveryAt}T12:00:00Z`).toISOString()
-          : undefined;
-
-      // National Address short code — required only when Region.shortAddressEnabled
-      // (typically Saudi Arabia). Other regions must not be blocked by this field.
-      let normalizedShortAddress: string | undefined;
-      if (shortAddressRequired) {
-        const cleaned = maskShortAddress(shortAddress);
-        if (!isValidShortAddress(cleaned)) {
-          setShortAddressError(t("checkout.shortAddressInvalid"));
-          throw new Error(t("checkout.shortAddressInvalid"));
-        }
-        normalizedShortAddress = cleaned;
-        setShortAddressError(null);
-      } else {
-        setShortAddressError(null);
-      }
-
-      let resolvedAddressId: string | undefined;
-      let inlineAddress: NewAddressValues | undefined;
-
-      if (selectedAddressId === "new") {
-        const ok = await triggerNewAddr();
-        if (!ok) throw new Error(t("checkout.completeAddress"));
-        inlineAddress = getNewAddrValues();
-      } else if (selectedAddressId) {
-        resolvedAddressId = selectedAddressId;
-      } else {
-        throw new Error(t("checkout.chooseAddress"));
-      }
-
-      // City for Tabby/shipping: zone name (e.g. Riyadh) when the form has no
-      // free-text city field — never leave it empty so Tabby doesn't get "City".
-      const zoneCityName =
-        zones.find((z) => z.id === inlineAddress?.deliveryZoneId)?.name ||
-        selectedCity ||
-        undefined;
-      const shippingAddress = inlineAddress
-        ? {
-            fullName: inlineAddress.fullName,
-            // Strip the spaces/dashes the input allows for readability — the
-            // stored value should be one clean digit string, not "+97150 123-4567".
-            phone: `${dialCode}${normalizePhoneDigits(inlineAddress.phone).replace(/[\s-]/g, "")}`,
-            city: zoneCityName,
-            area: inlineAddress.area,
-            deliveryZoneId: inlineAddress.deliveryZoneId || undefined,
-          }
+  // Reused by Place order (COD / MyFatoorah / Tabby) and Moyasar on_initiating.
+  const createCheckoutOrder = async (
+    methodOverride?: "COD" | "MYFATOORAH" | "MOYASAR" | "TABBY"
+  ) => {
+    const method = methodOverride ?? paymentMethod;
+    const methodIsOnline =
+      method === "MYFATOORAH" || method === "MOYASAR" || method === "TABBY";
+    if (deliveryType === "SCHEDULED" && !scheduledDeliveryAt) {
+      throw new Error(t("checkout.chooseDeliveryDateError"));
+    }
+    // Delivery-config gates (backend re-validates all of these authoritatively).
+    // COD unavailability only blocks a COD order — an online payment is unaffected.
+    if (!methodIsOnline && codUnavailable) throw new Error(t("checkout.codUnavailable"));
+    if (belowMinOrder) {
+      throw new Error(
+        t("checkout.minOrderError", {
+          amount: formatCurrency(minOrderAmount!, currency, locale),
+        })
+      );
+    }
+    if (aboveMaxOrder) {
+      throw new Error(
+        t("checkout.maxOrderError", {
+          amount: formatCurrency(maxOrderAmount!, currency, locale),
+        })
+      );
+    }
+    // Only a date is collected (no time-of-day input) — pin it to noon UTC so the
+    // resulting instant safely sits within the same calendar day in any timezone
+    // the backend's BUSINESS_TIMEZONE day-boundary check might use, rather than
+    // relying on implicit UTC-midnight parsing of a bare "YYYY-MM-DD" string.
+    const scheduledDeliveryAtIso =
+      deliveryType === "SCHEDULED"
+        ? new Date(`${scheduledDeliveryAt}T12:00:00Z`).toISOString()
         : undefined;
 
-      // Cash arrangement is PER LINE now — it rides on each cart line (chosen on the product
-      // page). The backend re-resolves eligibility + fee authoritatively at order time, so no
-      // pre-submit re-check is needed here.
-      if (!isAuthed) {
-        // Guest: no server cart — send the local cart items inline (each with its own cash). COD only.
-        if (cart.items.length === 0) throw new Error(t("checkout.cartEmptyError"));
-        const guestOrder = await ordersApi.guestCheckout({
-          items: cart.items.map((i) => ({
-            productId: i.productId,
-            quantity: i.quantity,
-            message: i.message ?? null,
-            selectedOptions: i.selectedOptions ?? undefined,
-            giftCardSelected: i.giftCardSelected,
-            customName: i.customName ?? undefined,
-            cashArrangement: i.cashArrangement
-              ? {
-                  cashAmount: i.cashArrangement.cashAmount,
-                  denomination: i.cashArrangement.denomination ?? undefined,
-                  note: i.cashArrangement.note || undefined,
-                }
-              : undefined,
-          })),
-          // Guests always fill the inline form, so shippingAddress is defined.
-          shippingAddress: shippingAddress!,
-          shortAddress: normalizedShortAddress,
-          email: inlineAddress?.email?.trim() || undefined,
-          orderMessage: orderMessage.trim() || undefined,
-          promoCode: promoResult ? promoCode.trim() : undefined,
-          deliveryType,
-          scheduledDeliveryAt: scheduledDeliveryAtIso,
-          paymentMethod: payingOnline ? paymentMethod : "COD",
-        });
-        // Online guest order: get the hosted payment URL via guest-pay; onSuccess redirects.
-        // Return URL carries ?guest=1 so the browser comes back to the guest success page.
-        if (payingOnline) {
-          const returnUrl = `${window.location.origin}${localize(ROUTES.orderSuccess)}?guest=1`;
-          const { paymentUrl } = await ordersApi.guestPay(guestOrder.id, {
-            returnUrl,
-            lang: appLocale === "ar" ? "ar" : "en",
-          });
-          return { order: guestOrder, paymentUrl };
-        }
-        return { order: guestOrder };
+    // National Address short code — required only when Region.shortAddressEnabled
+    // (typically Saudi Arabia). Other regions must not be blocked by this field.
+    let normalizedShortAddress: string | undefined;
+    if (shortAddressRequired) {
+      const cleaned = maskShortAddress(shortAddress);
+      if (!isValidShortAddress(cleaned)) {
+        setShortAddressError(t("checkout.shortAddressInvalid"));
+        throw new Error(t("checkout.shortAddressInvalid"));
       }
+      normalizedShortAddress = cleaned;
+      setShortAddressError(null);
+    } else {
+      setShortAddressError(null);
+    }
 
-      // Authenticated: mirror the local cart (incl. each line's cash) to the server cart, then
-      // check out — the order reads the per-line cash from the server cart.
-      await syncCart();
-      const order = await ordersApi.checkout({
-        addressId: resolvedAddressId,
-        shippingAddress,
+    let resolvedAddressId: string | undefined;
+    let inlineAddress: NewAddressValues | undefined;
+
+    if (selectedAddressId === "new") {
+      const ok = await triggerNewAddr();
+      if (!ok) throw new Error(t("checkout.completeAddress"));
+      inlineAddress = getNewAddrValues();
+    } else if (selectedAddressId) {
+      resolvedAddressId = selectedAddressId;
+    } else {
+      throw new Error(t("checkout.chooseAddress"));
+    }
+
+    // City for Tabby/shipping: zone name (e.g. Riyadh) when the form has no
+    // free-text city field — never leave it empty so Tabby doesn't get "City".
+    const zoneCityName =
+      zones.find((z) => z.id === inlineAddress?.deliveryZoneId)?.name ||
+      selectedCity ||
+      undefined;
+    const shippingAddress = inlineAddress
+      ? {
+          fullName: inlineAddress.fullName,
+          // Strip the spaces/dashes the input allows for readability — the
+          // stored value should be one clean digit string, not "+97150 123-4567".
+          phone: `${dialCode}${normalizePhoneDigits(inlineAddress.phone).replace(/[\s-]/g, "")}`,
+          city: zoneCityName,
+          area: inlineAddress.area,
+          deliveryZoneId: inlineAddress.deliveryZoneId || undefined,
+        }
+      : undefined;
+
+    // Cash arrangement is PER LINE now — it rides on each cart line (chosen on the product
+    // page). The backend re-resolves eligibility + fee authoritatively at order time, so no
+    // pre-submit re-check is needed here.
+    if (!isAuthed) {
+      // Guest: no server cart — send the local cart items inline (each with its own cash).
+      if (cart.items.length === 0) throw new Error(t("checkout.cartEmptyError"));
+      return ordersApi.guestCheckout({
+        items: cart.items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          message: i.message ?? null,
+          selectedOptions: i.selectedOptions ?? undefined,
+          giftCardSelected: i.giftCardSelected,
+          customName: i.customName ?? undefined,
+          cashArrangement: i.cashArrangement
+            ? {
+                cashAmount: i.cashArrangement.cashAmount,
+                denomination: i.cashArrangement.denomination ?? undefined,
+                note: i.cashArrangement.note || undefined,
+              }
+            : undefined,
+        })),
+        // Guests always fill the inline form, so shippingAddress is defined.
+        shippingAddress: shippingAddress!,
         shortAddress: normalizedShortAddress,
-        paymentMethod: payingOnline ? paymentMethod : "COD",
+        email: inlineAddress?.email?.trim() || undefined,
+        orderMessage: orderMessage.trim() || undefined,
         promoCode: promoResult ? promoCode.trim() : undefined,
         deliveryType,
         scheduledDeliveryAt: scheduledDeliveryAtIso,
+        paymentMethod: methodIsOnline ? method : "COD",
       });
+    }
+
+    // Authenticated: mirror the local cart (incl. each line's cash) to the server cart, then
+    // check out — the order reads the per-line cash from the server cart.
+    await syncCart();
+    return ordersApi.checkout({
+      addressId: resolvedAddressId,
+      shippingAddress,
+      shortAddress: normalizedShortAddress,
+      paymentMethod: methodIsOnline ? method : "COD",
+      promoCode: promoResult ? promoCode.trim() : undefined,
+      deliveryType,
+      scheduledDeliveryAt: scheduledDeliveryAtIso,
+    });
+  };
+
+  // Pending Moyasar order created from on_initiating — reused on Pay retry.
+  const moyasarPendingRef = useRef<{ id: string; isGuest: boolean } | null>(null);
+  useEffect(() => {
+    moyasarPendingRef.current = null;
+  }, [cartFingerprint, paymentMethod]);
+
+  const moyasarFormQuery = useQuery({
+    queryKey: ["moyasar-form-config"],
+    queryFn: () => ordersApi.getMoyasarFormConfig(),
+    enabled: cardOnlineMethod === "MOYASAR" && cardOnlineAvailable,
+    staleTime: 10 * 60_000,
+    retry: 1,
+  });
+
+  /** Moyasar Pay / Apple Pay: create order (if needed) + return authoritative form overrides. */
+  const initiateMoyasarPayment = async (): Promise<
+    false | MoyasarInitiatingResult
+  > => {
+    try {
+      setSubmitError(null);
+      setPaymentMethod("MOYASAR");
+      let orderId = moyasarPendingRef.current?.id;
+      let guest = moyasarPendingRef.current?.isGuest ?? !isAuthed;
+
+      if (!orderId) {
+        // Always charge as MOYASAR even if Tabby/COD radio was selected earlier.
+        const order = await createCheckoutOrder("MOYASAR");
+        orderId = order.id;
+        guest = !isAuthed;
+        moyasarPendingRef.current = { id: orderId, isGuest: guest };
+        if (guest) {
+          try {
+            sessionStorage.setItem(STORAGE_KEYS.guestOrder, JSON.stringify(order));
+          } catch {
+            /* sessionStorage unavailable */
+          }
+        }
+        writePendingOnlineOrder(orderId);
+      }
+
+      const returnUrl = (() => {
+        const u = new URL(
+          localize(ROUTES.orderMoyasarReturn),
+          window.location.origin
+        );
+        u.searchParams.set("oid", orderId!);
+        if (guest) u.searchParams.set("guest", "1");
+        return u.toString();
+      })();
+
+      const pay = guest
+        ? await ordersApi.guestPay(orderId!, {
+            returnUrl,
+            lang: appLocale === "ar" ? "ar" : "en",
+          })
+        : await ordersApi.pay(orderId!, {
+            returnUrl,
+            lang: appLocale === "ar" ? "ar" : "en",
+          });
+
+      const form = pay.form;
+      if (pay.mode !== "embedded" || !form) {
+        throw new Error(t("checkout.moyasarFormLoadError"));
+      }
+
+      return {
+        orderId: orderId!,
+        isGuest: guest,
+        amount: form.amount,
+        description: form.description,
+        callbackUrl: form.callbackUrl,
+        metadata: form.metadata,
+      };
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : t("checkout.orderFailed");
+      setSubmitError(message);
+      toast.error({ title: t("checkout.checkoutFailed"), description: message });
+      return false;
+    }
+  };
+
+  const placeOrderMutation = useMutation({
+    mutationFn: async () => {
+      // Moyasar pays via the inline form — Place order must not create a second path.
+      if (paymentMethod === "MOYASAR") {
+        throw new Error(t("checkout.moyasarUseForm"));
+      }
+      const order = await createCheckoutOrder();
 
       // Online: the order is PENDING_PAYMENT and the cart is kept until payment lands.
-      // Fetch the gateway hosted-page URL (MyFatoorah or Tabby) so onSuccess can redirect.
       if (payingOnline) {
-        // Tell the backend where to send the browser back after paying: this region+locale's
-        // order-success page (absolute URL). On failure the callback swaps it to order-error.
-        const returnUrl = `${window.location.origin}${localize(ROUTES.orderSuccess)}`;
-        const { paymentUrl } = await ordersApi.pay(order.id, {
-          returnUrl,
-          lang: appLocale === "ar" ? "ar" : "en",
-        });
-        return { order, paymentUrl };
+        // MyFatoorah / Tabby: hosted redirect URL.
+        const returnUrl = isAuthed
+          ? `${window.location.origin}${localize(ROUTES.orderSuccess)}`
+          : `${window.location.origin}${localize(ROUTES.orderSuccess)}?guest=1`;
+        const pay = isAuthed
+          ? await ordersApi.pay(order.id, {
+              returnUrl,
+              lang: appLocale === "ar" ? "ar" : "en",
+            })
+          : await ordersApi.guestPay(order.id, {
+              returnUrl,
+              lang: appLocale === "ar" ? "ar" : "en",
+            });
+        return { order, paymentUrl: pay.paymentUrl };
       }
       return { order };
     },
     onSuccess: ({ order, paymentUrl }) => {
-      // Online payment: DON'T clear the cart or show the thank-you yet — the backend keeps
-      // both until MyFatoorah confirms. Hand the browser off to the hosted payment page;
-      // MyFatoorah returns to the success/error page, which the backend re-verifies.
+      // Online redirect (MyFatoorah / Tabby): DON'T clear the cart yet.
       if (paymentUrl) {
-        // Guest online payment: stash the order so the success page can render it after the
-        // MyFatoorah round-trip (guests can't refetch an order). sessionStorage survives the
-        // same-tab redirect out to MyFatoorah and back.
         if (!isAuthed) {
           try {
             sessionStorage.setItem(STORAGE_KEYS.guestOrder, JSON.stringify(order));
@@ -784,8 +915,6 @@ export function CheckoutClient() {
             /* sessionStorage unavailable — success page falls back gracefully */
           }
         }
-        // Remember the order so a later visit can clear the (guest) cart if they
-        // paid on Tabby/MyFatoorah and never returned to our success page.
         writePendingOnlineOrder(order.id);
         window.location.href = paymentUrl;
         return;
@@ -971,7 +1100,27 @@ export function CheckoutClient() {
             myFatoorahAvailable={myFatoorahAvailable}
             tabbyAvailable={tabbyAvailable}
             paymentMethod={paymentMethod}
-            onPaymentMethodChange={setPaymentMethod}
+            onPaymentMethodChange={selectPaymentMethod}
+            cardOnlineMethod={cardOnlineMethod}
+            applePayEnabled={Boolean(currentRegion?.applePayEnabled)}
+            cardPaymentEnabled={Boolean(currentRegion?.cardPaymentEnabled)}
+            moyasarBootstrap={moyasarFormQuery.data ?? null}
+            moyasarBootstrapLoading={moyasarFormQuery.isLoading}
+            moyasarBootstrapError={
+              moyasarFormQuery.isError
+                ? moyasarFormQuery.error instanceof Error
+                  ? moyasarFormQuery.error.message
+                  : t("checkout.moyasarFormLoadError")
+                : null
+            }
+            onMoyasarInitiating={initiateMoyasarPayment}
+            onMoyasarFailure={(message) => {
+              setSubmitError(message);
+              toast.error({
+                title: t("checkout.checkoutFailed"),
+                description: message,
+              });
+            }}
             tabbyRejected={tabbyRejected}
             tabbyRejectMessage={tabbyRejected ? submitError : null}
             belowMinOrder={belowMinOrder}
@@ -1503,8 +1652,17 @@ interface OrderReviewCardProps {
   onlinePayAvailable: boolean;
   myFatoorahAvailable: boolean;
   tabbyAvailable: boolean;
-  paymentMethod: "COD" | "MYFATOORAH" | "TABBY";
-  onPaymentMethodChange: (v: "COD" | "MYFATOORAH" | "TABBY") => void;
+  paymentMethod: "COD" | "MYFATOORAH" | "MOYASAR" | "TABBY";
+  onPaymentMethodChange: (v: "COD" | "MYFATOORAH" | "MOYASAR" | "TABBY") => void;
+  /** Resolved card gateway for this region (MyFatoorah or Moyasar). */
+  cardOnlineMethod: "MYFATOORAH" | "MOYASAR";
+  applePayEnabled: boolean;
+  cardPaymentEnabled: boolean;
+  moyasarBootstrap: import("@/features/orders/types").MoyasarFormBootstrap | null;
+  moyasarBootstrapLoading: boolean;
+  moyasarBootstrapError: string | null;
+  onMoyasarInitiating: () => Promise<false | MoyasarInitiatingResult>;
+  onMoyasarFailure: (message: string) => void;
   /** Tabby session was rejected — Place order stays blocked until cart/phone/email change. */
   tabbyRejected: boolean;
   tabbyRejectMessage: string | null;
@@ -1552,6 +1710,14 @@ function OrderReviewCard({
   tabbyAvailable,
   paymentMethod,
   onPaymentMethodChange,
+  cardOnlineMethod,
+  applePayEnabled,
+  cardPaymentEnabled,
+  moyasarBootstrap,
+  moyasarBootstrapLoading,
+  moyasarBootstrapError,
+  onMoyasarInitiating,
+  onMoyasarFailure,
   tabbyRejected,
   tabbyRejectMessage,
   belowMinOrder,
@@ -1562,7 +1728,19 @@ function OrderReviewCard({
 }: OrderReviewCardProps) {
   const { currency, locale } = useCurrency();
   const { t, locale: appLocale } = useT();
+  const localize = useLocalizedHref();
   const tabbySnippet = getTabbySnippetConfig();
+  // Moyasar: card form is always on checkout (no "Pay online" radio to expand).
+  const showMoyasarInline =
+    cardOnlineMethod === "MOYASAR" && myFatoorahAvailable;
+  const moyasarMethods = useMemo(() => {
+    const methods: string[] = [];
+    if (cardPaymentEnabled) methods.push("creditcard");
+    if (applePayEnabled) methods.push("applepay");
+    return methods.length > 0 ? methods : ["creditcard"];
+  }, [applePayEnabled, cardPaymentEnabled]);
+  // Cart total in minor units for the form preview; on_initiating replaces with server amount.
+  const moyasarPreviewAmount = Math.max(100, Math.round(total * 100));
 
   // ONE combined VAT figure = product VAT + cash-arrangement fee VAT (both at the same rate),
   // shown on a single "VAT" line — the fee's VAT is not split out next to the fee.
@@ -1916,10 +2094,46 @@ function OrderReviewCard({
 
         <Divider />
 
-        {/* Payment: top-level siblings — Card/Apple Pay, Tabby, COD (only when each is available). */}
-        {onlinePayAvailable ? (
+        {/* Payment: Moyasar form always visible (no radio); MyFatoorah keeps radio + Place order. */}
+        {onlinePayAvailable || showMoyasarInline ? (
           <div className="flex flex-col gap-3">
-            {myFatoorahAvailable ? (
+            {showMoyasarInline ? (
+              <div className="overflow-x-hidden rounded-2xl border border-ink-200 bg-white p-3 sm:p-4">
+                {moyasarBootstrapLoading ? (
+                  <p className="text-sm text-ink-500">
+                    {t("checkout.moyasarFormLoading")}
+                  </p>
+                ) : null}
+                {moyasarBootstrapError ? (
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    {moyasarBootstrapError}
+                  </p>
+                ) : null}
+                {moyasarBootstrap && !moyasarBootstrapError ? (
+                  <MoyasarPayForm
+                    form={{
+                      publishableApiKey: moyasarBootstrap.publishableApiKey,
+                      amount: moyasarPreviewAmount,
+                      currency: String(currency || "SAR").toUpperCase(),
+                      description: t("checkout.moyasarCheckoutDescription"),
+                      // Placeholder only — on_initiating sets the real return URL with order id.
+                      callbackUrl: localize(ROUTES.orderMoyasarReturn),
+                      language: appLocale === "ar" ? "ar" : "en",
+                      methods: moyasarMethods,
+                      supportedNetworks: moyasarBootstrap.supportedNetworks,
+                      scriptUrl: moyasarBootstrap.scriptUrl,
+                      cssUrl: moyasarBootstrap.cssUrl,
+                      applePay: moyasarMethods.includes("applepay")
+                        ? moyasarBootstrap.applePay
+                        : undefined,
+                      metadata: {},
+                    }}
+                    onInitiating={onMoyasarInitiating}
+                    onFailure={onMoyasarFailure}
+                  />
+                ) : null}
+              </div>
+            ) : myFatoorahAvailable ? (
               <label
                 className={cn(
                   "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition",
@@ -1937,7 +2151,9 @@ function OrderReviewCard({
                 />
                 <div>
                   <p className="font-medium text-ink-900">{t("checkout.payCard")}</p>
-                  <p className="mt-0.5 text-xs text-ink-500">{t("checkout.payCardHint")}</p>
+                  <p className="mt-0.5 text-xs text-ink-500">
+                    {t("checkout.payCardHint")}
+                  </p>
                 </div>
               </label>
             ) : null}
@@ -2047,17 +2263,20 @@ function OrderReviewCard({
           </div>
         ) : null}
 
-        <Button
-          type="button"
-          size="xl"
-          fullWidth
-          onClick={onPlaceOrder}
-          isLoading={isPlacing}
-          disabled={placeOrderDisabled}
-        >
-          {t("checkout.placeOrder")} ·{" "}
-          <CurrencyAmount amount={total} currency={currency} locale={locale} />
-        </Button>
+        {/* Moyasar card form pays itself; Place order only for COD / Tabby / MyFatoorah. */}
+        {paymentMethod === "MOYASAR" ? null : (
+          <Button
+            type="button"
+            size="xl"
+            fullWidth
+            onClick={onPlaceOrder}
+            isLoading={isPlacing}
+            disabled={placeOrderDisabled}
+          >
+            {t("checkout.placeOrder")} ·{" "}
+            <CurrencyAmount amount={total} currency={currency} locale={locale} />
+          </Button>
+        )}
       </Card>
     </aside>
   );

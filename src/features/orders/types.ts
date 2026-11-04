@@ -13,9 +13,49 @@ export type OrderStatus =
   | "FAILED"
   | "DRAFT";
 
-// Checkout can initiate COD, MYFATOORAH (card/Apple Pay), or TABBY (Pay in 4).
-// Mobile or older clients may still return only a subset — UI must handle all three.
-export type PaymentMethod = "COD" | "MYFATOORAH" | "TABBY";
+// Checkout can initiate COD, MYFATOORAH/MOYASAR (card/Apple Pay), or TABBY (Pay in 4).
+export type PaymentMethod = "COD" | "MYFATOORAH" | "MOYASAR" | "TABBY";
+
+/** Public bootstrap from GET /orders/payment/moyasar/form-config (no order yet). */
+export type MoyasarFormBootstrap = {
+  publishableApiKey: string;
+  scriptUrl: string;
+  cssUrl: string;
+  supportedNetworks: string[];
+  applePay: {
+    country: string;
+    label: string;
+    validateMerchantUrl: string;
+  };
+};
+
+/** Moyasar embedded form config returned by POST /orders/:id/pay (mode=embedded). */
+export type MoyasarEmbeddedForm = {
+  publishableApiKey: string;
+  amount: number;
+  currency: string;
+  description: string;
+  callbackUrl: string;
+  language: "en" | "ar";
+  methods: string[];
+  supportedNetworks: string[];
+  metadata: Record<string, string>;
+  scriptUrl: string;
+  cssUrl: string;
+  applePay?: {
+    country: string;
+    label: string;
+    validateMerchantUrl: string;
+  };
+};
+
+export type StartOnlinePaymentResult = {
+  mode: "redirect" | "embedded";
+  paymentUrl: string | null;
+  invoiceId: string | null;
+  form: MoyasarEmbeddedForm | null;
+  orderId: string;
+};
 
 /** STANDARD (default) or SCHEDULED (customer picked a future date/time at checkout). */
 export type DeliveryType = "STANDARD" | "SCHEDULED";

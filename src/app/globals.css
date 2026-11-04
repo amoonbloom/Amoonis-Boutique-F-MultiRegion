@@ -205,6 +205,55 @@ html[dir="rtl"] :where(.uppercase) {
 }
 
 /* =====================================================================
+   Moyasar embedded form (checkout)
+   --------------------------------------------------------------------
+   Brand icons sit absolute inside the card-number field. Moyasar's CSS
+   assumes ~360px fixed width; in our sidebar the padding-right often stays
+   at 12px while 4 network icons need ~160px — numbers collide with logos.
+   ===================================================================== */
+.mysr-form {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.mysr-form .mysr-form-ccInputGroup {
+  position: relative;
+  min-width: 0 !important;
+  width: 100%;
+}
+
+.mysr-form .mysr-form-ccInputGroup > .mysr-form-input {
+  /* Reserve space for mada + visa + mastercard + amex icons */
+  padding-right: 10.5rem !important;
+}
+
+.mysr-form .mysr-form-ccIconsGroup {
+  max-width: 55%;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mysr-form .mysr-form-ccIconsGroup .mysr-form-ccIcon {
+  flex: 0 0 auto;
+  width: 1.75rem !important;
+  height: 1.15rem !important;
+  margin-right: 0.15rem !important;
+}
+
+@media (max-width: 380px) {
+  .mysr-form .mysr-form-ccInputGroup > .mysr-form-input {
+    padding-right: 8.25rem !important;
+  }
+  .mysr-form .mysr-form-ccIconsGroup .mysr-form-ccIcon {
+    width: 1.4rem !important;
+    height: 0.95rem !important;
+  }
+}
+
+/* =====================================================================
    Autofill styling
    --------------------------------------------------------------------
    Browsers paint autofilled inputs with their own background (yellow on

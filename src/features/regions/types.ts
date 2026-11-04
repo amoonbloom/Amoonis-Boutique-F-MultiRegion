@@ -44,9 +44,11 @@ export interface ApiRegion {
   sameDayCutoff: string | null;
   /** Whether Cash on Delivery is offered in this region (default true). */
   codEnabled: boolean;
-  /** Whether online (card / Apple Pay via MyFatoorah) payment is offered in this
+  /** Whether online (card / Apple Pay) payment is offered in this
    *  region (default false — opt-in, since the gateway is currency-scoped). */
   onlinePaymentEnabled: boolean;
+  /** Card gateway when online payment is on: MyFatoorah (default) or Moyasar (KSA). */
+  onlinePaymentProvider: "MYFATOORAH" | "MOYASAR";
   /** Which online methods are offered when onlinePaymentEnabled is on (default true).
    *  Drive which options the storefront shows; Apple Pay is also enforced server-side. */
   applePayEnabled: boolean;
@@ -139,6 +141,7 @@ export interface ApiRegionCreateInput {
   sameDayCutoff?: string | null;
   codEnabled?: boolean;
   onlinePaymentEnabled?: boolean;
+  onlinePaymentProvider?: "MYFATOORAH" | "MOYASAR";
   applePayEnabled?: boolean;
   cardPaymentEnabled?: boolean;
   shortAddressEnabled?: boolean;

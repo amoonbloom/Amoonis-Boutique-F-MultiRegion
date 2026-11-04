@@ -415,7 +415,8 @@ export function ReceiptCard({ order }: { order: ApiOrder }) {
                   ? t("checkout.cod")
                   : order.paymentMethod === "TABBY"
                     ? t("checkout.payTabby")
-                    : order.paymentMethod === "MYFATOORAH"
+                    : order.paymentMethod === "MYFATOORAH" ||
+                        order.paymentMethod === "MOYASAR"
                       ? t("checkout.payCard")
                       : order.paymentMethod
               }
