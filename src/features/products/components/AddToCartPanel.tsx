@@ -36,6 +36,8 @@ interface AddToCartPanelProps {
   /** Same-day cutoff ("HH:mm") when same-day delivery is enabled for the current
    *  region/zone; null when not offered. Drives the same-day line in ShippingLeadNote. */
   sameDayCutoff?: string | null;
+  /** Optional upper bound from region/zone delivery config for the ETA range copy. */
+  deliveryLeadDaysMax?: number | null;
   /** Region code — only used to key the cash-arrangement eligibility query. */
   regionCode?: string;
 }
@@ -48,7 +50,12 @@ interface UnitConfig {
   cashArrangement: CartLineCashArrangement | null;
 }
 
-export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCartPanelProps) {
+export function AddToCartPanel({
+  product,
+  sameDayCutoff,
+  deliveryLeadDaysMax,
+  regionCode,
+}: AddToCartPanelProps) {
   const dispatch = useAppDispatch();
   const { add } = useCart();
   const { t } = useT();
@@ -499,7 +506,11 @@ export function AddToCartPanel({ product, sameDayCutoff, regionCode }: AddToCart
   return (
     <div id="add-to-cart-panel" className="flex flex-col gap-5">
       {product.deliveryLeadDays != null && (
-        <ShippingLeadNote days={product.deliveryLeadDays} sameDayCutoff={sameDayCutoff} />
+        <ShippingLeadNote
+          days={product.deliveryLeadDays}
+          daysMax={deliveryLeadDaysMax}
+          sameDayCutoff={sameDayCutoff}
+        />
       )}
 
       {product.options && product.options.length > 0 && (

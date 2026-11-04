@@ -20,8 +20,10 @@ export interface ResolvedDeliveryConfig {
   deliveryDays: number[];
   sameDayEnabled: boolean;
   sameDayCutoff: string | null;
-  /** Resolved standard courier lead days (zone override or region). */
+  /** Resolved standard courier lead days — lower bound (zone override or region). */
   standardLeadDays: number | null;
+  /** Optional upper bound for the ETA range. Null = single-number "within N days" copy. */
+  standardLeadDaysMax: number | null;
   codEnabled: boolean;
   minOrderAmount: number | null;
   maxOrderAmount: number | null;

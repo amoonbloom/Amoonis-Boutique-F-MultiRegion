@@ -84,6 +84,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const deliveryCfg = await getCachedDeliveryConfigForZone(region, zoneId).catch(() => null);
   const sameDayCutoff =
     deliveryCfg?.sameDayEnabled && deliveryCfg.sameDayCutoff ? deliveryCfg.sameDayCutoff : null;
+  const deliveryLeadDaysMax = deliveryCfg?.standardLeadDaysMax ?? null;
 
   let related: ReturnType<typeof toUiProducts> = [];
   if (api.categoryId) {
@@ -167,6 +168,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               <AddToCartPanel
                 product={product}
                 sameDayCutoff={sameDayCutoff}
+                deliveryLeadDaysMax={deliveryLeadDaysMax}
                 regionCode={region ?? ""}
               />
             </StaggerItem>

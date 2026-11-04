@@ -68,6 +68,11 @@ export function DeliveryZoneForm({
             .int(t("admin.deliveryZoneForm.wholeNumber"))
             .nonnegative(t("admin.deliveryZoneForm.nonNegative"))
             .nullable(),
+          standardLeadDaysMax: z
+            .number()
+            .int(t("admin.deliveryZoneForm.wholeNumber"))
+            .nonnegative(t("admin.deliveryZoneForm.nonNegative"))
+            .nullable(),
           deliveryDays: z.array(z.number().int()),
           codEnabled: z.enum(["inherit", "true", "false"]),
           minOrderAmount: z.number().nonnegative(t("admin.deliveryZoneForm.nonNegative")).nullable(),
@@ -81,6 +86,16 @@ export function DeliveryZoneForm({
           {
             message: t("admin.deliveryZoneForm.maxLessThanMin"),
             path: ["maxOrderAmount"],
+          }
+        )
+        .refine(
+          (v) =>
+            v.standardLeadDaysMax == null ||
+            v.standardLeadDays == null ||
+            v.standardLeadDaysMax >= v.standardLeadDays,
+          {
+            message: t("admin.deliveryZoneForm.standardLeadDaysMaxLessThanMin"),
+            path: ["standardLeadDaysMax"],
           }
         ),
     [t]
@@ -107,6 +122,7 @@ export function DeliveryZoneForm({
       sameDayEnabled: "inherit",
       sameDayCutoff: "",
       standardLeadDays: null,
+      standardLeadDaysMax: null,
       deliveryDays: [],
       codEnabled: "inherit",
       minOrderAmount: null,
@@ -129,6 +145,7 @@ export function DeliveryZoneForm({
       sameDayEnabled: triState(initial.sameDayEnabled),
       sameDayCutoff: initial.sameDayCutoff ?? "",
       standardLeadDays: initial.standardLeadDays ?? null,
+      standardLeadDaysMax: initial.standardLeadDaysMax ?? null,
       deliveryDays: initial.deliveryDays ?? [],
       codEnabled: triState(initial.codEnabled),
       minOrderAmount: initial.minOrderAmount != null ? Number(initial.minOrderAmount) : null,
@@ -157,6 +174,7 @@ export function DeliveryZoneForm({
       sameDayEnabled: triToBool(v.sameDayEnabled),
       sameDayCutoff: v.sameDayCutoff?.trim() || null,
       standardLeadDays: v.standardLeadDays,
+      standardLeadDaysMax: v.standardLeadDaysMax,
       deliveryDays: v.deliveryDays,
       codEnabled: triToBool(v.codEnabled),
       minOrderAmount: v.minOrderAmount,
@@ -274,6 +292,16 @@ export function DeliveryZoneForm({
               hint={t("admin.deliveryZoneForm.standardLeadDaysHint")}
               error={errors.standardLeadDays?.message}
               {...register("standardLeadDays", { setValueAs: numberOrNull })}
+            />
+            <Input
+              label={t("admin.deliveryZoneForm.standardLeadDaysMaxLabel")}
+              type="number"
+              step="1"
+              min="0"
+              placeholder="5"
+              hint={t("admin.deliveryZoneForm.standardLeadDaysMaxHint")}
+              error={errors.standardLeadDaysMax?.message}
+              {...register("standardLeadDaysMax", { setValueAs: numberOrNull })}
             />
             <div className="flex flex-col gap-1.5">
               <label htmlFor="zone-cod" className={labelClass}>

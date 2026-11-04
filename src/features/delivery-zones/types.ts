@@ -22,6 +22,8 @@ export interface ApiDeliveryZone {
   sameDayCutoff: string | null;
   /** Standard courier lead days for this zone. Null = inherit region.standardDeliveryDays. */
   standardLeadDays: number | null;
+  /** Optional upper bound for this zone. Null = inherit region.standardDeliveryDaysMax. */
+  standardLeadDaysMax: number | null;
   /** Allowed delivery weekdays (0=Sun..6=Sat). [] = inherit region. */
   deliveryDays: number[];
   /** COD offered? Null = inherit region. */
@@ -52,6 +54,7 @@ export interface ApiDeliveryZoneCreateInput {
   sameDayEnabled?: boolean | null;
   sameDayCutoff?: string | null;
   standardLeadDays?: number | null;
+  standardLeadDaysMax?: number | null;
   deliveryDays?: number[];
   codEnabled?: boolean | null;
   minOrderAmount?: number | null;

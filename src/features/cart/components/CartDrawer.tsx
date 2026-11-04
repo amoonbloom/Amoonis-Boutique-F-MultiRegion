@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { LocalizedLink } from "@/components/ui/LocalizedLink";
 import { m, AnimatePresence } from "motion/react";
 import { Button, Drawer, Divider, CurrencyAmount } from "@/components/ui";
@@ -10,6 +11,8 @@ import { OrderDeliveryNote, maxCartLeadDays } from "./OrderDeliveryNote";
 import { usePublicVat } from "@/features/vat/hooks/usePublicVat";
 import { vatHint } from "@/features/vat/vatDisplay";
 import { useCartCashTotals } from "@/features/cash-arrangement/hooks/useCartCashTotals";
+import { deliveryConfigApi } from "@/features/delivery-config/api/delivery-config.api";
+import { queryKeys } from "@/services/queryKeys";
 import { microTransition } from "@/lib/motion";
 import { ROUTES } from "@/constants/routes";
 import { useCurrency } from "@/features/location/hooks/useCurrency";
@@ -34,7 +37,14 @@ export function CartDrawer() {
   const { cashRawTotal, cashFeeTotal } = useCartCashTotals(items);
   const subtotal = productSubtotal + cashRawTotal + cashFeeTotal;
   const orderLeadDays = maxCartLeadDays(items);
-  const { currency, locale } = useCurrency();
+  const { currency, locale, countryCode: regionCode } = useCurrency();
+  const deliveryConfigQuery = useQuery({
+    queryKey: queryKeys.deliveryConfig.resolve(regionCode, undefined, undefined),
+    queryFn: () => deliveryConfigApi.get({ region: regionCode }),
+    enabled: Boolean(regionCode) && open && orderLeadDays != null,
+    staleTime: 60_000,
+  });
+  const deliveryLeadDaysMax = deliveryConfigQuery.data?.standardLeadDaysMax ?? null;
   // Only the plain "VAT Inclusive" label previews here — the exclusive
   // "+ VAT" addition is reserved for the shop grid and the real amount
   // on checkout, not repeated in the drawer.
@@ -70,7 +80,11 @@ export function CartDrawer() {
 
           <footer className="border-t border-ink-100 bg-cream-50 px-6 py-5">
             {orderLeadDays != null && (
-              <OrderDeliveryNote days={orderLeadDays} className="mb-4" />
+              <OrderDeliveryNote
+                days={orderLeadDays}
+                daysMax={deliveryLeadDaysMax}
+                className="mb-4"
+              />
             )}
             <div className="flex items-baseline justify-between">
               <span className="text-sm text-ink-600">{t("common.subtotal")}</span>

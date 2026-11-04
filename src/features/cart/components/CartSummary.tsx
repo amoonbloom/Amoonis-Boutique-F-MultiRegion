@@ -132,7 +132,12 @@ export function CartSummary({ variant = "page" }: CartSummaryProps) {
         </div>
       </dl>
 
-      {orderLeadDays != null && <OrderDeliveryNote days={orderLeadDays} />}
+      {orderLeadDays != null && (
+        <OrderDeliveryNote
+          days={orderLeadDays}
+          daysMax={deliveryConfig?.standardLeadDaysMax}
+        />
+      )}
 
       <Divider />
 

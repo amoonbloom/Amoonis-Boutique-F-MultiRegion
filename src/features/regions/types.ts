@@ -28,8 +28,11 @@ export interface ApiRegion {
   shippingFlatRate: string | null;
   /** Typical Standard Delivery lead time for this region, in whole days (e.g. 1, 3).
    * Null = not configured, so the storefront shows no ETA. Plain number — unlike
-   * shippingFlatRate, this is a Prisma Int, not a Decimal, so no string quirk. */
+   * shippingFlatRate, this is a Prisma Int, not a Decimal, so no string quirk.
+   * When standardDeliveryDaysMax is also set, the storefront shows "around X to Y days". */
   standardDeliveryDays: number | null;
+  /** Optional upper bound for the region's standard delivery window. Null = single ETA. */
+  standardDeliveryDaysMax: number | null;
   /** IANA timezone the region operates in (e.g. "Asia/Dubai"). Drives same-day cutoff,
    * "today", allowed weekdays and blackout-date math. Never null (defaults to Asia/Dubai). */
   timezone: string;
@@ -132,6 +135,7 @@ export interface ApiRegionCreateInput {
   legalEntity?: string | null;
   shippingFlatRate?: number | null;
   standardDeliveryDays?: number | null;
+  standardDeliveryDaysMax?: number | null;
   timezone?: string;
   freeDeliveryThreshold?: number | null;
   deliveryDays?: number[];

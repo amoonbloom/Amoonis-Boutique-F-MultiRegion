@@ -85,6 +85,11 @@ export function RegionForm({
         .int(t("admin.regionForm.standardDeliveryDaysWhole"))
         .nonnegative(t("admin.regionForm.standardDeliveryDaysMin"))
         .nullable(),
+      standardDeliveryDaysMax: z
+        .number()
+        .int(t("admin.regionForm.standardDeliveryDaysWhole"))
+        .nonnegative(t("admin.regionForm.standardDeliveryDaysMin"))
+        .nullable(),
       // City-level delivery configuration. Defaults live in `defaultValues`
       // below (not `.default()` here) so the schema's input and output types
       // stay identical — the resolver cast relies on that, exactly like the
@@ -144,6 +149,23 @@ export function RegionForm({
         .min(0, t("admin.regionForm.sortOrderMin")),
       isDefault: z.boolean(),
       isActive: z.boolean(),
+    }).superRefine((v, ctx) => {
+      if (v.standardDeliveryDaysMax == null) return;
+      if (v.standardDeliveryDays == null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t("admin.regionForm.standardDeliveryDaysMaxNeedsMin"),
+          path: ["standardDeliveryDaysMax"],
+        });
+        return;
+      }
+      if (v.standardDeliveryDaysMax < v.standardDeliveryDays) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t("admin.regionForm.standardDeliveryDaysMaxLessThanMin"),
+          path: ["standardDeliveryDaysMax"],
+        });
+      }
     });
 
     // Legal-page content is authored per region in the rich-text Pages editor
@@ -177,6 +199,7 @@ export function RegionForm({
       legalEntity: "",
       shippingFlatRate: null,
       standardDeliveryDays: null,
+      standardDeliveryDaysMax: null,
       timezone: DEFAULT_TIMEZONE,
       freeDeliveryThreshold: null,
       deliveryDays: [],
@@ -261,6 +284,7 @@ export function RegionForm({
       legalEntity: initial.legalEntity ?? "",
       shippingFlatRate: initial.shippingFlatRate != null ? Number(initial.shippingFlatRate) : null,
       standardDeliveryDays: initial.standardDeliveryDays ?? null,
+      standardDeliveryDaysMax: initial.standardDeliveryDaysMax ?? null,
       timezone: initial.timezone || DEFAULT_TIMEZONE,
       freeDeliveryThreshold:
         initial.freeDeliveryThreshold != null ? Number(initial.freeDeliveryThreshold) : null,
@@ -310,6 +334,7 @@ export function RegionForm({
       legalEntity: v.legalEntity?.trim() || null,
       shippingFlatRate: v.shippingFlatRate,
       standardDeliveryDays: v.standardDeliveryDays,
+      standardDeliveryDaysMax: v.standardDeliveryDaysMax,
       timezone: v.timezone?.trim() || DEFAULT_TIMEZONE,
       freeDeliveryThreshold: v.freeDeliveryThreshold,
       deliveryDays: v.deliveryDays ?? [],
@@ -427,6 +452,18 @@ export function RegionForm({
               hint={t("admin.regionForm.standardDeliveryDaysHint")}
               error={errors.standardDeliveryDays?.message}
               {...register("standardDeliveryDays", {
+                setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+              })}
+            />
+            <Input
+              label={t("admin.regionForm.standardDeliveryDaysMaxLabel")}
+              type="number"
+              step="1"
+              min="0"
+              placeholder="5"
+              hint={t("admin.regionForm.standardDeliveryDaysMaxHint")}
+              error={errors.standardDeliveryDaysMax?.message}
+              {...register("standardDeliveryDaysMax", {
                 setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
               })}
             />

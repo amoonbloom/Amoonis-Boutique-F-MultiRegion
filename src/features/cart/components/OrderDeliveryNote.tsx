@@ -4,6 +4,7 @@ import { TruckIcon } from "@/components/icons";
 import { useT } from "@/i18n/useT";
 import { formatDayCount } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { hasDeliveryLeadRange } from "@/features/delivery-config/deliveryLeadCopy";
 import type { CartItem } from "@/store/slices/cart.slice";
 
 /**
@@ -23,15 +24,19 @@ export function maxCartLeadDays(items: Pick<CartItem, "deliveryLeadDays">[]): nu
  * Order-level "your order will be delivered within N day(s)" badge — shown once per cart
  * (drawer, full cart, checkout review) instead of a note under every line item. The
  * per-PRODUCT note still appears on the product detail page (see ShippingLeadNote).
+ * Pass `daysMax` from the resolved delivery config to show a range when configured.
  */
 export function OrderDeliveryNote({
   days,
+  daysMax,
   className,
 }: {
   days: number;
+  daysMax?: number | null;
   className?: string;
 }) {
   const { t, locale } = useT();
+  const showRange = hasDeliveryLeadRange(days, daysMax);
   return (
     <div
       className={cn(
@@ -43,7 +48,12 @@ export function OrderDeliveryNote({
       <span>
         {days === 0
           ? t("cart.orderDeliveryZero")
-          : t("cart.orderDelivery", { days: formatDayCount(days, locale) })}
+          : showRange
+            ? t("cart.orderDeliveryRange", {
+                minDays: formatDayCount(days, locale),
+                maxDays: formatDayCount(daysMax, locale),
+              })
+            : t("cart.orderDelivery", { days: formatDayCount(days, locale) })}
       </span>
     </div>
   );

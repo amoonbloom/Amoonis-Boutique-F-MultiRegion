@@ -78,6 +78,7 @@ import { useIsHydrated } from "@/hooks/useIsHydrated";
 import { useToast } from "@/hooks/useToast";
 import { ApiError } from "@/services/http";
 import { formatCurrency, formatDayCount } from "@/lib/format";
+import { hasDeliveryLeadRange } from "@/features/delivery-config/deliveryLeadCopy";
 import {
   addDaysToKey,
   daysBetweenKeys,
@@ -1989,9 +1990,20 @@ function OrderReviewCard({
                   ? t("checkout.standardDeliveryEtaUnknown")
                   : effectiveStandardDeliveryDays === 0
                     ? t("checkout.standardDeliveryEtaZero")
-                    : t("checkout.standardDeliveryEta", {
-                        days: formatDayCount(effectiveStandardDeliveryDays, appLocale),
-                      })}
+                    : hasDeliveryLeadRange(
+                          resolvedStandardLead,
+                          deliveryConfig?.standardLeadDaysMax
+                        )
+                      ? t("checkout.standardDeliveryEtaRange", {
+                          minDays: formatDayCount(resolvedStandardLead!, appLocale),
+                          maxDays: formatDayCount(
+                            deliveryConfig!.standardLeadDaysMax!,
+                            appLocale
+                          ),
+                        })
+                      : t("checkout.standardDeliveryEta", {
+                          days: formatDayCount(effectiveStandardDeliveryDays, appLocale),
+                        })}
               </p>
             </div>
           </label>
