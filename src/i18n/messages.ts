@@ -312,12 +312,16 @@ export const messages = {
       applePayOr: "OR",
       applePayCta: "Pay with Apple Pay",
       applePaySheetTitle: "Express checkout",
-      applePaySheetSubtitle: "Pay securely with Apple Pay — no full checkout needed.",
+      applePaySheetSubtitle:
+        "Confirm delivery details, then pay with Apple Pay. Name, phone, and email come from your Wallet.",
       applePayName: "Full name",
       applePayPhone: "Phone number",
       applePayNationalAddress: "National address",
       applePayEmailOptional: "Email (optional)",
       applePayAddressOptional: "Street address (optional)",
+      applePayWalletHint: "Name, phone, and email are filled from Apple Pay.",
+      applePayContactMissing:
+        "Apple Pay didn’t share a name or phone. Add them in Wallet, then try again.",
       applePayUnsupported:
         "Apple Pay works in Safari on an Apple device with Apple Pay set up. Please open this page in Safari, or continue with Add to cart.",
       applePayNeedLocation: "Please select a delivery city first (Deliver to).",
@@ -2417,12 +2421,16 @@ export const messages = {
       applePayOr: "أو",
       applePayCta: "ادفع عبر Apple Pay",
       applePaySheetTitle: "دفع سريع",
-      applePaySheetSubtitle: "ادفع بأمان عبر Apple Pay — دون إتمام الدفع الكامل.",
+      applePaySheetSubtitle:
+        "أكد تفاصيل التوصيل ثم ادفع عبر Apple Pay. الاسم والجوال والبريد تُؤخذ من المحفظة.",
       applePayName: "الاسم الكامل",
       applePayPhone: "رقم الجوال",
       applePayNationalAddress: "العنوان الوطني",
       applePayEmailOptional: "البريد الإلكتروني (اختياري)",
       applePayAddressOptional: "عنوان الشارع (اختياري)",
+      applePayWalletHint: "يُعبَّأ الاسم والجوال والبريد من Apple Pay.",
+      applePayContactMissing:
+        "لم يشارك Apple Pay الاسم أو الجوال. أضفهما في المحفظة ثم حاول مجددًا.",
       applePayUnsupported:
         "يعمل Apple Pay في متصفح Safari على جهاز Apple مع تفعيل Apple Pay. افتح هذه الصفحة في Safari، أو تابع بإضافة المنتج إلى السلة.",
       applePayNeedLocation: "يرجى اختيار مدينة التوصيل أولاً (التوصيل إلى).",

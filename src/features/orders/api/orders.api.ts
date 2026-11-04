@@ -61,6 +61,37 @@ export const ordersApi = {
     return data.data;
   },
 
+  /** Overwrite shipping/guest contact from Apple Pay Wallet after authorization. */
+  async updateExpressContact(
+    orderId: string,
+    payload: { fullName: string; phone: string; email?: string }
+  ): Promise<
+    Pick<
+      ApiOrder,
+      | "id"
+      | "orderNumber"
+      | "totalAmount"
+      | "currency"
+      | "status"
+      | "paymentStatus"
+    >
+  > {
+    const { data } = await http.patch<
+      ApiResponse<
+        Pick<
+          ApiOrder,
+          | "id"
+          | "orderNumber"
+          | "totalAmount"
+          | "currency"
+          | "status"
+          | "paymentStatus"
+        >
+      >
+    >(`/orders/${orderId}/express-contact`, payload);
+    return data.data;
+  },
+
   async myHistory(
     params: ApiOrderHistoryParams = {}
   ): Promise<PaginatedResponse<ApiOrderListRow>> {
