@@ -25,8 +25,6 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import { pushToast } from "@/store/slices/ui.slice";
 import type { Product } from "../types";
 
-const APPLE_PAY_SDK_SRC =
-  "https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js";
 const MOYASAR_PAYMENTS_URL = "https://api.moyasar.com/v1/payments";
 
 type ApplePayContact = {
@@ -127,34 +125,6 @@ function normalizeWalletPhone(raw: string, dialCode: string): string {
   return `${dialCode}${digits}`;
 }
 
-async function loadApplePaySdk(): Promise<boolean> {
-  if (typeof document === "undefined" || typeof customElements === "undefined") {
-    return false;
-  }
-  if (!document.querySelector(`script[src="${APPLE_PAY_SDK_SRC}"]`)) {
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = APPLE_PAY_SDK_SRC;
-      script.async = true;
-      script.crossOrigin = "anonymous";
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load Apple Pay SDK"));
-      document.head.appendChild(script);
-    });
-  }
-  try {
-    await Promise.race([
-      customElements.whenDefined("apple-pay-button"),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("apple-pay-button timeout")), 4000)
-      ),
-    ]);
-    return Boolean(customElements.get("apple-pay-button"));
-  } catch {
-    return false;
-  }
-}
-
 /** Official-style Apple logo mark for the black express CTA. */
 function AppleLogoMark({ className }: { className?: string }) {
   return (
@@ -174,46 +144,14 @@ function AppleLogoMark({ className }: { className?: string }) {
   );
 }
 
-function NativeApplePayButton({
-  disabled,
-  locale,
-  onPay,
-}: {
-  disabled: boolean;
-  locale: string;
-  onPay: () => void;
-}) {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const onPayRef = useRef(onPay);
-  onPayRef.current = onPay;
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host || disabled) return;
-    const btn = host.querySelector("apple-pay-button");
-    if (!btn) return;
-    // Must stay synchronous — ApplePaySession must be created inside this gesture.
-    const handler = (e: Event) => {
-      e.preventDefault();
-      onPayRef.current();
-    };
-    btn.addEventListener("click", handler);
-    return () => btn.removeEventListener("click", handler);
-  }, [disabled, locale]);
-
-  return (
-    <div
-      ref={hostRef}
-      className="w-full"
-      style={{
-        opacity: disabled ? 0.5 : 1,
-        pointerEvents: disabled ? "none" : "auto",
-      }}
-      dangerouslySetInnerHTML={{
-        __html: `<apple-pay-button buttonstyle="black" type="plain" locale="${locale}" style="display:block;width:100%;height:56px;--apple-pay-button-width:100%;--apple-pay-button-height:56px;--apple-pay-button-border-radius:16px;--apple-pay-button-box-sizing:border-box;"></apple-pay-button>`,
-      }}
-    />
-  );
+/** Safely end an Apple Pay session — abort/complete throw if already closed. */
+function safeAbortSession(session: ApplePaySessionInstance | null) {
+  if (!session) return;
+  try {
+    session.abort();
+  } catch {
+    /* already closed / unsupported after dismiss */
+  }
 }
 
 export type PdpApplePayExpressProps = {
@@ -242,7 +180,7 @@ export function PdpApplePayExpress({
   const dispatch = useAppDispatch();
   const router = useRouter();
   const localize = useLocalizedHref();
-  const { t, locale: appLocale } = useT();
+  const { t } = useT();
   const token = useAppSelector((s) => s.auth.token);
   const user = useAppSelector((s) => s.auth.user);
   const selectedCity = useAppSelector((s) => s.location.city);
@@ -270,9 +208,9 @@ export function PdpApplePayExpress({
   const [paying, setPaying] = useState(false);
   const [orderReady, setOrderReady] = useState(false);
   const [preparingOrder, setPreparingOrder] = useState(false);
-  const [hasApplePayButton, setHasApplePayButton] = useState(false);
   const pendingOrderRef = useRef<PendingExpressOrder | null>(null);
   const sessionBusyRef = useRef(false);
+  const activeSessionRef = useRef<ApplePaySessionInstance | null>(null);
   const prepareGenRef = useRef(0);
 
   const zonesQuery = useQuery({
@@ -295,18 +233,29 @@ export function PdpApplePayExpress({
     retry: 1,
   });
 
+  // Reset / abort whenever the sheet opens or closes so reopen is clean.
+  // Closing must abort any live ApplePaySession — otherwise a second open/close
+  // throws "The object does not support the operation or argument".
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      safeAbortSession(activeSessionRef.current);
+      activeSessionRef.current = null;
+      sessionBusyRef.current = false;
+      setPaying(false);
+      setPreparingOrder(false);
+      // Keep pendingOrderRef so a quick reopen can reuse the prepared order
+      // without another create — cleared when fields/items change below.
+      return;
+    }
     setAppleOk(applePaySupported());
     setFieldError(null);
     setPaying(false);
-    setOrderReady(false);
-    setPreparingOrder(false);
-    pendingOrderRef.current = null;
     sessionBusyRef.current = false;
-    void loadApplePaySdk()
-      .then((ready) => setHasApplePayButton(ready))
-      .catch(() => setHasApplePayButton(false));
+    safeAbortSession(activeSessionRef.current);
+    activeSessionRef.current = null;
+    // Fresh sheet: re-check order readiness (may already be cached in ref).
+    setOrderReady(Boolean(pendingOrderRef.current));
+    setPreparingOrder(false);
   }, [open]);
 
   // Changing line items / address means the pre-created order is stale.
@@ -517,10 +466,15 @@ export function PdpApplePayExpress({
       requiredShippingContactFields: ["name", "phone", "email"],
     };
 
+    // Abort any leftover session before starting a new one (reopen safety).
+    safeAbortSession(activeSessionRef.current);
+    activeSessionRef.current = null;
+
     let session: ApplePaySessionInstance;
     try {
       // Must stay synchronous — this is the user-gesture boundary Safari enforces.
       session = new AP(version, paymentRequest);
+      activeSessionRef.current = session;
     } catch (e) {
       sessionBusyRef.current = false;
       setPaying(false);
@@ -531,6 +485,9 @@ export function PdpApplePayExpress({
     }
 
     const clearBusy = () => {
+      if (activeSessionRef.current === session) {
+        activeSessionRef.current = null;
+      }
       sessionBusyRef.current = false;
       setPaying(false);
     };
@@ -556,11 +513,7 @@ export function PdpApplePayExpress({
         const merchantSession = await res.json();
         session.completeMerchantValidation(merchantSession);
       } catch (e) {
-        try {
-          session.abort();
-        } catch {
-          /* already closed */
-        }
+        safeAbortSession(session);
         clearBusy();
         failToast(
           e instanceof Error ? e.message : t("checkout.moyasarPayFailed")
@@ -577,7 +530,11 @@ export function PdpApplePayExpress({
       const email = contact?.emailAddress?.trim() || undefined;
 
       if (!fullName || !phone) {
-        session.completePayment(AP.STATUS_FAILURE);
+        try {
+          session.completePayment(AP.STATUS_FAILURE);
+        } catch {
+          /* already closed */
+        }
         clearBusy();
         failToast(t("product.applePayContactMissing"));
         return;
@@ -623,7 +580,11 @@ export function PdpApplePayExpress({
         };
 
         if (!payRes.ok || !payment?.id || payment.status !== "paid") {
-          session.completePayment(AP.STATUS_FAILURE);
+          try {
+            session.completePayment(AP.STATUS_FAILURE);
+          } catch {
+            /* already closed */
+          }
           clearBusy();
           failToast(
             payment?.message || payment?.type || t("checkout.moyasarPayFailed")
@@ -642,7 +603,11 @@ export function PdpApplePayExpress({
           orderId: orderSnap.id,
         });
 
-        session.completePayment(AP.STATUS_SUCCESS);
+        try {
+          session.completePayment(AP.STATUS_SUCCESS);
+        } catch {
+          /* already closed */
+        }
         clearBusy();
         onClose();
 
@@ -742,7 +707,14 @@ export function PdpApplePayExpress({
 
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={() => {
+          // Abort before unmount so Apple's session isn't torn down uncleanly.
+          safeAbortSession(activeSessionRef.current);
+          activeSessionRef.current = null;
+          sessionBusyRef.current = false;
+          setPaying(false);
+          onClose();
+        }}
         title={t("product.applePaySheetTitle")}
         description={t("product.applePaySheetSubtitle")}
         size="md"
@@ -791,29 +763,25 @@ export function PdpApplePayExpress({
             <p className="text-sm text-ink-500">{t("checkout.moyasarFormLoading")}</p>
           ) : null}
 
+          {/* Use our own button — Apple's <apple-pay-button> custom element throws
+              "object does not support the operation or argument" when React
+              unmounts it on modal close/reopen. ApplePaySession still runs from
+              this click (user-gesture safe). */}
           {appleOk && bootstrap && !preparingOrder ? (
-            hasApplePayButton ? (
-              <NativeApplePayButton
-                disabled={payDisabled}
-                locale={appLocale === "ar" ? "ar-SA" : "en-US"}
-                onPay={startApplePay}
-              />
-            ) : (
-              <button
-                type="button"
-                disabled={payDisabled}
-                onClick={startApplePay}
-                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-black px-8 text-base font-medium text-white transition hover:bg-ink-900 disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label={t("product.applePayCta")}
-              >
-                <AppleLogoMark className="shrink-0 text-white" />
-                <span>
-                  {paying
-                    ? t("checkout.moyasarFormLoading")
-                    : t("product.applePayCta")}
-                </span>
-              </button>
-            )
+            <button
+              type="button"
+              disabled={payDisabled}
+              onClick={startApplePay}
+              className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-black px-8 text-base font-medium text-white transition hover:bg-ink-900 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={t("product.applePayCta")}
+            >
+              <AppleLogoMark className="shrink-0 text-white" />
+              <span>
+                {paying
+                  ? t("checkout.moyasarFormLoading")
+                  : t("product.applePayCta")}
+              </span>
+            </button>
           ) : null}
 
           {appleOk && moyasarFormQuery.isLoading ? (
