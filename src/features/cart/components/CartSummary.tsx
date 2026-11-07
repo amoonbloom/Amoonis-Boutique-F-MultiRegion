@@ -163,6 +163,7 @@ export function CartSummary({ variant = "page" }: CartSummaryProps) {
       tabbySnippet.configured &&
       total > 0 ? (
         <TabbyPromoSnippet
+          key={`cart-tabby-${Number(total).toFixed(2)}`}
           price={total}
           currency={currency}
           lang={appLocale === "ar" ? "ar" : "en"}

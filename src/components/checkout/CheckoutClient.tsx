@@ -1,7 +1,7 @@
 "use client";
 
 import { LocalizedLink } from "@/components/ui/LocalizedLink";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -521,10 +521,39 @@ export function CheckoutClient() {
         .join("|"),
     [cart.items]
   );
-  // Unblock Tabby Place order after cart / phone / email change (Tabby QA).
-  useEffect(() => {
+  // Snapshot contact+cart when Tabby rejects; clear the lock as soon as any of
+  // them change (Tabby QA: phone/email/cart update must re-enable Place order).
+  const tabbyRejectSnapshotRef = useRef<{
+    phone: string;
+    email: string;
+    cart: string;
+  } | null>(null);
+  const clearTabbyRejection = useCallback(() => {
+    const hadRejection = tabbyRejectSnapshotRef.current !== null;
+    tabbyRejectSnapshotRef.current = null;
     setTabbyRejected(false);
-  }, [cartFingerprint, watchedPhone, watchedEmail]);
+    if (hadRejection) setSubmitError(null);
+  }, []);
+  useEffect(() => {
+    if (!tabbyRejected) return;
+    const snap = tabbyRejectSnapshotRef.current;
+    if (!snap) return;
+    const phone = String(watchedPhone ?? "");
+    const email = String(watchedEmail ?? "");
+    if (
+      phone !== snap.phone ||
+      email !== snap.email ||
+      cartFingerprint !== snap.cart
+    ) {
+      clearTabbyRejection();
+    }
+  }, [
+    tabbyRejected,
+    cartFingerprint,
+    watchedPhone,
+    watchedEmail,
+    clearTabbyRejection,
+  ]);
 
   // VAT preview for the current region. The public endpoint intentionally omits the
   // SPECIFIC_PRODUCTS/SPECIFIC_CATEGORIES scope lists (that's catalog-scoping data, not
@@ -960,6 +989,11 @@ export function CheckoutClient() {
             message
           ))
       ) {
+        tabbyRejectSnapshotRef.current = {
+          phone: String(watchedPhone ?? ""),
+          email: String(watchedEmail ?? ""),
+          cart: cartFingerprint,
+        };
         setTabbyRejected(true);
       }
       setSubmitError(message);
@@ -1058,6 +1092,7 @@ export function CheckoutClient() {
             orderMessage={orderMessage}
             onOrderMessageChange={setOrderMessage}
             submitError={submitError}
+            onContactChange={clearTabbyRejection}
           />
 
           <OrderReviewCard
@@ -1237,6 +1272,8 @@ interface BillingShippingCardProps {
   orderMessage: string;
   onOrderMessageChange: (v: string) => void;
   submitError: string | null;
+  /** Fired when phone or email is edited — clears Tabby rejection lock. */
+  onContactChange?: () => void;
 }
 
 function BillingShippingCard({
@@ -1261,9 +1298,11 @@ function BillingShippingCard({
   orderMessage,
   onOrderMessageChange,
   submitError,
+  onContactChange,
 }: BillingShippingCardProps) {
   const { t, locale: uiLocale } = useT();
   const phoneField = regNewAddr("phone");
+  const emailField = regNewAddr("email");
   const zoneRequired = !zonesLoading && zones.length > 0;
   return (
     <Card variant="flat" padding="lg" className="flex flex-col gap-5">
@@ -1435,9 +1474,10 @@ function BillingShippingCard({
                 className={`h-full min-w-0 flex-1 rounded-e-2xl bg-transparent px-3 text-start text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none ${PHONE_LTR_CLASS}`}
                 onKeyDown={(event) => handlePhoneKeyDown(event, phoneDigitLimit)}
                 {...phoneField}
-                onChange={(event) =>
-                  handlePhoneInputChange(event, uiLocale, phoneField.onChange, phoneDigitLimit)
-                }
+                onChange={(event) => {
+                  handlePhoneInputChange(event, uiLocale, phoneField.onChange, phoneDigitLimit);
+                  onContactChange?.();
+                }}
               />
             </div>
             {newAddrErrors.phone?.message ? (
@@ -1453,7 +1493,11 @@ function BillingShippingCard({
               hint={t("checkout.emailHint")}
               error={newAddrErrors.email?.message}
               containerClassName="sm:col-span-2"
-              {...regNewAddr("email")}
+              {...emailField}
+              onChange={(event) => {
+                emailField.onChange(event);
+                onContactChange?.();
+              }}
             />
           ) : null}
         </div>
@@ -2187,6 +2231,7 @@ function OrderReviewCard({
                 </label>
                 {paymentMethod === "TABBY" && tabbySnippet.configured ? (
                   <TabbyCheckoutCard
+                    key={`tabby-card-${Number(total).toFixed(2)}-${currency}`}
                     price={total}
                     currency={currency}
                     lang={appLocale === "ar" ? "ar" : "en"}

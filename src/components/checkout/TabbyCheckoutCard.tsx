@@ -55,6 +55,10 @@ function loadTabbyCardScript(): Promise<void> {
 /**
  * Official Tabby checkout snippet (TabbyCard). Mount only while Tabby is selected.
  * Container id must NOT be "TabbyCard" — that shadows window.TabbyCard (per Tabby docs).
+ *
+ * Cart qty changes update `price` while this stays mounted. Tabby's script does not
+ * reliably re-bind after clearing the same DOM node, so each amount gets a fresh
+ * host id/key and we remount TabbyCard against that node.
  */
 export function TabbyCheckoutCard({
   price,
@@ -64,7 +68,9 @@ export function TabbyCheckoutCard({
   merchantCode,
 }: TabbyCheckoutCardProps) {
   const reactId = useId().replace(/:/g, "");
-  const containerId = `tabby-checkout-card-${reactId}`;
+  const priceToken = Number.isFinite(price) && price > 0 ? Number(price).toFixed(2) : "0";
+  const priceIdPart = priceToken.replace(".", "-");
+  const containerId = `tabby-checkout-card-${reactId}-${priceIdPart}`;
   const mountKey = useRef(0);
 
   useEffect(() => {
@@ -81,7 +87,6 @@ export function TabbyCheckoutCard({
       try {
         await loadTabbyCardScript();
         if (cancelled || thisMount !== mountKey.current) return;
-        // Recreate the host node so re-inits don't leave an empty shell.
         const host = document.getElementById(containerId);
         if (!host || !window.TabbyCard) return;
         host.replaceChildren();
@@ -89,7 +94,7 @@ export function TabbyCheckoutCard({
         new window.TabbyCard({
           selector: `#${containerId}`,
           currency: cur,
-          price: Number(price).toFixed(2),
+          price: priceToken,
           lang,
           shouldInheritBg: true,
           publicKey,
@@ -103,17 +108,24 @@ export function TabbyCheckoutCard({
     return () => {
       cancelled = true;
     };
-  }, [containerId, price, currency, lang, publicKey, merchantCode]);
+  }, [containerId, price, priceToken, currency, lang, publicKey, merchantCode]);
 
   if (!publicKey || !merchantCode) return null;
+  if (!Number.isFinite(price) || price <= 0) return null;
 
   return (
     <div
-      id={containerId}
       className="mt-3 min-h-[3rem] w-full min-w-[280px] max-w-full overflow-hidden"
       // Stop label click from toggling the radio when interacting with the snippet.
       onClick={(e) => e.preventDefault()}
       onKeyDown={(e) => e.stopPropagation()}
-    />
+    >
+      <div
+        key={containerId}
+        id={containerId}
+        className="min-h-[3rem] w-full min-w-[280px]"
+        data-tabby-card-price={priceToken}
+      />
+    </div>
   );
 }

@@ -57,6 +57,10 @@ function loadTabbyPromoScript(): Promise<void> {
 /**
  * Official TabbyPromo for product / cart pages.
  * Container id must NOT be "TabbyPromo" (shadows the constructor — Tabby docs).
+ *
+ * On cart qty changes the price updates frequently. Tabby's promo script does not
+ * reliably re-bind after clearing the same DOM node, so each amount gets a fresh
+ * host id/key and we remount TabbyPromo against that node.
  */
 export function TabbyPromoSnippet({
   price,
@@ -68,7 +72,9 @@ export function TabbyPromoSnippet({
   className,
 }: TabbyPromoSnippetProps) {
   const reactId = useId().replace(/:/g, "");
-  const containerId = `tabby-promo-${source}-${reactId}`;
+  const priceToken = Number.isFinite(price) && price > 0 ? Number(price).toFixed(2) : "0";
+  const priceIdPart = priceToken.replace(".", "-");
+  const containerId = `tabby-promo-${source}-${reactId}-${priceIdPart}`;
   const mountKey = useRef(0);
 
   useEffect(() => {
@@ -87,13 +93,13 @@ export function TabbyPromoSnippet({
         if (cancelled || thisMount !== mountKey.current) return;
         const host = document.getElementById(containerId);
         if (!host || !window.TabbyPromo) return;
-        // Clear in place — never replaceWith (breaks React ownership; cart refresh crash).
+        // Fresh host per priceToken — only clear leftover nodes if any.
         host.replaceChildren();
         // eslint-disable-next-line no-new
         new window.TabbyPromo({
           selector: `#${containerId}`,
           currency: cur,
-          price: Number(price).toFixed(2),
+          price: priceToken,
           lang,
           source,
           shouldInheritBg: true,
@@ -108,10 +114,19 @@ export function TabbyPromoSnippet({
     return () => {
       cancelled = true;
     };
-  }, [containerId, price, currency, lang, source, publicKey, merchantCode, className]);
+  }, [containerId, price, priceToken, currency, lang, source, publicKey, merchantCode]);
 
   if (!publicKey || !merchantCode) return null;
   if (!Number.isFinite(price) || price <= 0) return null;
 
-  return <div id={containerId} className={className ?? "mt-3 w-full min-w-[280px]"} />;
+  return (
+    <div className={className ?? "mt-3 w-full min-w-[280px]"}>
+      <div
+        key={containerId}
+        id={containerId}
+        className="w-full min-w-[280px]"
+        data-tabby-promo-price={priceToken}
+      />
+    </div>
+  );
 }
