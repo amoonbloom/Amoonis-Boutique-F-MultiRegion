@@ -232,8 +232,11 @@ function useProductFormSchema() {
           // untouched override (undefined) is accepted the same as an explicit null.
           cashArrangementFeeStepAmount: z.number().positive().nullish(),
           cashArrangementFeeMarginPercent: z.number().nonnegative().nullish(),
-          // Per-region gift-option price overrides. Null/blank = use the product's
-          // global giftCardExtraPrice / customNamePrice for that region.
+          // Per-region gift options. Null/blank = inherit the product's global
+          // enable / mode / charge for that region.
+          giftCardEnabled: z.boolean().nullish(),
+          customNameEnabled: z.boolean().nullish(),
+          giftCardMode: z.enum(["MESSAGE", "NAME"]).nullish(),
           giftCardExtraPrice: z.number().nonnegative().nullish(),
           customNamePrice: z.number().nonnegative().nullish(),
         })
@@ -433,6 +436,9 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
             deliveryLeadDays: rp.deliveryLeadDays ?? null,
             cashArrangementFeeStepAmount: rp.cashArrangementFeeStepAmount ?? null,
             cashArrangementFeeMarginPercent: rp.cashArrangementFeeMarginPercent ?? null,
+            giftCardEnabled: rp.giftCardEnabled ?? null,
+            customNameEnabled: rp.customNameEnabled ?? null,
+            giftCardMode: rp.giftCardMode ?? null,
             giftCardExtraPrice: rp.giftCardExtraPrice ?? null,
             customNamePrice: rp.customNamePrice ?? null,
           },
@@ -664,6 +670,9 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
         deliveryLeadDays: v.deliveryLeadDays ?? null,
         cashArrangementFeeStepAmount: v.cashArrangementFeeStepAmount ?? null,
         cashArrangementFeeMarginPercent: v.cashArrangementFeeMarginPercent ?? null,
+        giftCardEnabled: v.giftCardEnabled ?? null,
+        customNameEnabled: v.customNameEnabled ?? null,
+        giftCardMode: v.giftCardMode ?? null,
         giftCardExtraPrice: v.giftCardExtraPrice ?? null,
         customNamePrice: v.customNamePrice ?? null,
       })),
@@ -1056,53 +1065,150 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
               </div>
             </div>
 
-            {overrideRegions.map((region) => (
-              <div key={`gift-${region.id}`} className="mt-4 border-t border-ink-100 pt-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-ink-700">
-                  Gift option prices · {region.name} ({region.currency})
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {/* Custom name first — matches the storefront "Add Custom Name (+ …)?"
-                      line, so region overrides are harder to put in the wrong field. */}
-                  <Input
-                    label={`Custom name extra (${region.currency})`}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    hint="Overrides the default custom-name charge for this region only"
-                    disabled={!customNameEnabled}
-                    error={
-                      (
-                        errors.regionPrices as
-                          | Record<string, { customNamePrice?: { message?: string } }>
-                          | undefined
-                      )?.[region.id]?.customNamePrice?.message
-                    }
-                    {...register(`regionPrices.${region.id}.customNamePrice`, {
-                      setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
-                    })}
-                  />
-                  <Input
-                    label={`Gift card extra (${region.currency})`}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    hint="Overrides the default gift-card charge for this region only"
-                    disabled={!giftCardEnabled}
-                    error={
-                      (
-                        errors.regionPrices as
-                          | Record<string, { giftCardExtraPrice?: { message?: string } }>
-                          | undefined
-                      )?.[region.id]?.giftCardExtraPrice?.message
-                    }
-                    {...register(`regionPrices.${region.id}.giftCardExtraPrice`, {
-                      setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
-                    })}
-                  />
+            {overrideRegions.map((region) => {
+              const regionCustomNameOverride = watch(`regionPrices.${region.id}.customNameEnabled`);
+              const regionGiftCardOverride = watch(`regionPrices.${region.id}.giftCardEnabled`);
+              const regionGiftModeOverride = watch(`regionPrices.${region.id}.giftCardMode`);
+              const regionCustomNameOn =
+                regionCustomNameOverride == null ? customNameEnabled : !!regionCustomNameOverride;
+              const regionGiftCardOn =
+                regionGiftCardOverride == null ? giftCardEnabled : !!regionGiftCardOverride;
+              return (
+                <div key={`gift-${region.id}`} className="mt-4 border-t border-ink-100 pt-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-ink-700">
+                    Gift options · {region.name} ({region.currency})
+                  </p>
+                  <p className="mb-3 text-xs text-ink-500">
+                    Leave “Use default” to inherit the product setting above. Choose Offer or
+                    Don’t offer to override for this region only.
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-ink-700">
+                          Custom name in {region.name}
+                        </label>
+                        <Select
+                          value={
+                            regionCustomNameOverride == null
+                              ? ""
+                              : regionCustomNameOverride
+                                ? "true"
+                                : "false"
+                          }
+                          onChange={(v) =>
+                            setValue(
+                              `regionPrices.${region.id}.customNameEnabled`,
+                              v === "" ? null : v === "true",
+                              { shouldDirty: true }
+                            )
+                          }
+                          triggerClassName="w-full rounded-lg py-2 justify-between"
+                          aria-label={`Custom name in ${region.name}`}
+                          options={[
+                            { value: "", label: "Use default" },
+                            { value: "true", label: "Offer" },
+                            { value: "false", label: "Don’t offer" },
+                          ]}
+                        />
+                      </div>
+                      <Input
+                        label={`Custom name extra (${region.currency})`}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        hint="Blank = use default-region charge"
+                        disabled={!regionCustomNameOn}
+                        error={
+                          (
+                            errors.regionPrices as
+                              | Record<string, { customNamePrice?: { message?: string } }>
+                              | undefined
+                          )?.[region.id]?.customNamePrice?.message
+                        }
+                        {...register(`regionPrices.${region.id}.customNamePrice`, {
+                          setValueAs: (v) =>
+                            v === "" || v === null || v === undefined ? null : Number(v),
+                        })}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-ink-700">
+                          Gift card in {region.name}
+                        </label>
+                        <Select
+                          value={
+                            regionGiftCardOverride == null
+                              ? ""
+                              : regionGiftCardOverride
+                                ? "true"
+                                : "false"
+                          }
+                          onChange={(v) =>
+                            setValue(
+                              `regionPrices.${region.id}.giftCardEnabled`,
+                              v === "" ? null : v === "true",
+                              { shouldDirty: true }
+                            )
+                          }
+                          triggerClassName="w-full rounded-lg py-2 justify-between"
+                          aria-label={`Gift card in ${region.name}`}
+                          options={[
+                            { value: "", label: "Use default" },
+                            { value: "true", label: "Offer" },
+                            { value: "false", label: "Don’t offer" },
+                          ]}
+                        />
+                      </div>
+                      <Input
+                        label={`Gift card extra (${region.currency})`}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        hint="Blank = use default-region charge"
+                        disabled={!regionGiftCardOn}
+                        error={
+                          (
+                            errors.regionPrices as
+                              | Record<string, { giftCardExtraPrice?: { message?: string } }>
+                              | undefined
+                          )?.[region.id]?.giftCardExtraPrice?.message
+                        }
+                        {...register(`regionPrices.${region.id}.giftCardExtraPrice`, {
+                          setValueAs: (v) =>
+                            v === "" || v === null || v === undefined ? null : Number(v),
+                        })}
+                      />
+                      {regionGiftCardOn ? (
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-medium text-ink-700">
+                            Gift card asks for ({region.name})
+                          </label>
+                          <Select
+                            value={regionGiftModeOverride ?? ""}
+                            onChange={(v) =>
+                              setValue(
+                                `regionPrices.${region.id}.giftCardMode`,
+                                v === "" ? null : (v as "MESSAGE" | "NAME"),
+                                { shouldDirty: true }
+                              )
+                            }
+                            triggerClassName="w-full rounded-lg py-2 justify-between"
+                            aria-label={`Gift card mode in ${region.name}`}
+                            options={[
+                              { value: "", label: "Use default" },
+                              { value: "MESSAGE", label: t("admin.productForm.giftModeMessage") },
+                              { value: "NAME", label: t("admin.productForm.giftModeName") },
+                            ]}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
 

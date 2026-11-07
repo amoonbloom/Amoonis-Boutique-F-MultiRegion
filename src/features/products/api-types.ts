@@ -123,6 +123,12 @@ export interface ApiProductRegionPrice {
    *  utils/cashArrangementMath.js on the backend for the full precedence chain). */
   cashArrangementFeeStepAmount?: number | null;
   cashArrangementFeeMarginPercent?: number | null;
+  /** Per-region gift-card offer. Null = inherit product giftCardEnabled. */
+  giftCardEnabled?: boolean | null;
+  /** Per-region custom-name offer. Null = inherit product customNameEnabled. */
+  customNameEnabled?: boolean | null;
+  /** Per-region gift-card mode. Null = inherit product/category mode. */
+  giftCardMode?: "MESSAGE" | "NAME" | null;
   /** Per-region gift-card extra charge. Null = use product global giftCardExtraPrice. */
   giftCardExtraPrice?: number | null;
   /** Per-region custom-name extra charge. Null = use product global customNamePrice. */
