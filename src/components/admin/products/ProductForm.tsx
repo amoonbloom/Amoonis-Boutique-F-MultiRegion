@@ -301,8 +301,14 @@ function useProductFormSchema() {
       comingSoonRegionIds: z.array(z.string()),
       // Per-region "on sale": which of the product's regions show a Sale badge + label.
       onSaleRegionIds: z.array(z.string()),
-      saleLabel: z.string().optional(),
-      saleLabel_ar: z.string().optional(),
+      // Per-region Sale badge text (EN/AR), keyed by regionId.
+      regionSaleLabels: z.record(
+        z.string(),
+        z.object({
+          saleLabel: z.string().optional(),
+          saleLabel_ar: z.string().optional(),
+        })
+      ),
       regionIds: z.array(z.string()),
       images: z.array(z.string().url()).max(20, t("admin.productForm.imagesMax")),
       descriptions: z.array(descriptionSchema),
@@ -346,8 +352,7 @@ const emptyDefaults: ProductFormValues = {
   status: "PUBLISHED",
   comingSoonRegionIds: [],
   onSaleRegionIds: [],
-  saleLabel: "",
-  saleLabel_ar: "",
+  regionSaleLabels: {},
   regionIds: [],
   images: [],
   descriptions: [],
@@ -476,8 +481,24 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
       status: initial.status ?? "PUBLISHED",
       comingSoonRegionIds: initial.comingSoonRegionIds ?? [],
       onSaleRegionIds: initial.onSaleRegionIds ?? [],
-      saleLabel: initial.saleLabel ?? "",
-      saleLabel_ar: initial.saleLabel_ar ?? "",
+      regionSaleLabels: (() => {
+        const fromRegions = initial.regionSaleLabels ?? {};
+        if (Object.keys(fromRegions).length > 0) {
+          return Object.fromEntries(
+            Object.entries(fromRegions).map(([id, v]) => [
+              id,
+              { saleLabel: v?.saleLabel ?? "", saleLabel_ar: v?.saleLabel_ar ?? "" },
+            ])
+          );
+        }
+        // Seed from legacy global label so existing copy isn't lost in the per-region UI.
+        const en = initial.saleLabel ?? "";
+        const ar = initial.saleLabel_ar ?? "";
+        if (!en && !ar) return {};
+        return Object.fromEntries(
+          (initial.onSaleRegionIds ?? []).map((id) => [id, { saleLabel: en, saleLabel_ar: ar }])
+        );
+      })(),
       regionIds: initial.regionIds ?? [],
       images: initial.images,
       descriptions: initial.descriptions.map((d) => ({
@@ -572,6 +593,7 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
   const status = watch("status");
   const comingSoonRegionIds = watch("comingSoonRegionIds") ?? [];
   const onSaleRegionIds = watch("onSaleRegionIds") ?? [];
+  const regionSaleLabels = watch("regionSaleLabels") ?? {};
   // Regions the product is in (from the picker) decide which regions' zones get
   // per-zone delivery-time inputs — only zones of selected regions are shown.
   const selectedRegionIds = watch("regionIds");
@@ -753,8 +775,20 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
           : [],
       // On sale is orthogonal to status (visual badge) — keep it regardless of draft/published.
       onSaleRegionIds: (values.onSaleRegionIds ?? []).filter((id) => (values.regionIds ?? []).includes(id)),
-      saleLabel: values.saleLabel?.trim() || null,
-      saleLabel_ar: values.saleLabel_ar?.trim() || null,
+      regionSaleLabels: Object.fromEntries(
+        (values.onSaleRegionIds ?? [])
+          .filter((id) => (values.regionIds ?? []).includes(id))
+          .map((id) => {
+            const row = values.regionSaleLabels?.[id];
+            return [
+              id,
+              {
+                saleLabel: row?.saleLabel?.trim() || null,
+                saleLabel_ar: row?.saleLabel_ar?.trim() || null,
+              },
+            ];
+          })
+      ),
       regionIds: values.regionIds,
       images: values.images,
       descriptions: cleanedDescriptions,
@@ -1700,12 +1734,13 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
               return <p className="text-sm text-ink-400">{t("admin.productForm.comingSoonNoRegions")}</p>;
             }
             return (
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  {saleRegions.map((r) => {
-                    const checked = onSaleRegionIds.includes(r.id);
-                    return (
-                      <label key={r.id} className="flex cursor-pointer items-center gap-2.5 text-sm text-ink-800">
+              <div className="flex flex-col gap-3">
+                {saleRegions.map((r) => {
+                  const checked = onSaleRegionIds.includes(r.id);
+                  const labels = regionSaleLabels[r.id] ?? { saleLabel: "", saleLabel_ar: "" };
+                  return (
+                    <div key={r.id} className="flex flex-col gap-2.5">
+                      <label className="flex cursor-pointer items-center gap-2.5 text-sm text-ink-800">
                         <input
                           type="checkbox"
                           checked={checked}
@@ -1714,27 +1749,50 @@ export function ProductForm({ initial, onSubmit, submitting, submitLabel }: Prod
                               ? [...onSaleRegionIds, r.id]
                               : onSaleRegionIds.filter((id) => id !== r.id);
                             setValue("onSaleRegionIds", next, { shouldDirty: true });
+                            if (e.target.checked && !regionSaleLabels[r.id]) {
+                              setValue(
+                                `regionSaleLabels.${r.id}`,
+                                { saleLabel: "", saleLabel_ar: "" },
+                                { shouldDirty: true }
+                              );
+                            }
                           }}
                           className="h-4 w-4 rounded border-ink-300 text-bloom-600 focus:ring-bloom-500/30"
                         />
                         <span>{locale === "ar" ? r.name_ar || r.name : r.name}</span>
                       </label>
-                    );
-                  })}
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Input
-                    label={t("admin.productForm.saleLabelEn")}
-                    placeholder={t("admin.productForm.saleLabelPlaceholder")}
-                    {...register("saleLabel")}
-                  />
-                  <Input
-                    label={t("admin.productForm.saleLabelAr")}
-                    placeholder={t("admin.productForm.saleLabelPlaceholderAr")}
-                    dir="rtl"
-                    {...register("saleLabel_ar")}
-                  />
-                </div>
+                      {checked ? (
+                        <div className="ms-6 grid min-w-0 gap-3 sm:grid-cols-2">
+                          <Input
+                            label={t("admin.productForm.saleLabelEn")}
+                            placeholder={t("admin.productForm.saleLabelPlaceholder")}
+                            value={labels.saleLabel ?? ""}
+                            onChange={(e) =>
+                              setValue(
+                                `regionSaleLabels.${r.id}`,
+                                { ...labels, saleLabel: e.target.value },
+                                { shouldDirty: true }
+                              )
+                            }
+                          />
+                          <Input
+                            label={t("admin.productForm.saleLabelAr")}
+                            placeholder={t("admin.productForm.saleLabelPlaceholderAr")}
+                            dir="rtl"
+                            value={labels.saleLabel_ar ?? ""}
+                            onChange={(e) =>
+                              setValue(
+                                `regionSaleLabels.${r.id}`,
+                                { ...labels, saleLabel_ar: e.target.value },
+                                { shouldDirty: true }
+                              )
+                            }
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}

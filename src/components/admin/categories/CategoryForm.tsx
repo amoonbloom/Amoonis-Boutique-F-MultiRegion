@@ -44,8 +44,14 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
         comingSoonRegionIds: z.array(z.string()),
         // Per-region "on sale": cascades a Sale badge to the category's products + a label.
         onSaleRegionIds: z.array(z.string()),
-        saleLabel: z.string().optional(),
-        saleLabel_ar: z.string().optional(),
+        // Per-region Sale badge text (EN/AR), keyed by regionId.
+        regionSaleLabels: z.record(
+          z.string(),
+          z.object({
+            saleLabel: z.string().optional(),
+            saleLabel_ar: z.string().optional(),
+          })
+        ),
         // null = no category default (products fall through to the MESSAGE default).
         giftCardMode: z.enum(["MESSAGE", "NAME"]).nullable(),
         draftScope: z.enum(["HOME_ONLY", "ENTIRE_STORE"]),
@@ -123,8 +129,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
       status: "PUBLISHED",
       comingSoonRegionIds: [],
       onSaleRegionIds: [],
-      saleLabel: "",
-      saleLabel_ar: "",
+      regionSaleLabels: {},
       giftCardMode: null,
       draftScope: "HOME_ONLY",
       deliveryLeadDays: null,
@@ -159,6 +164,7 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
   const watchedStatus = watch("status");
   const comingSoonRegionIds = watch("comingSoonRegionIds") ?? [];
   const onSaleRegionIds = watch("onSaleRegionIds") ?? [];
+  const regionSaleLabels = watch("regionSaleLabels") ?? {};
   const watchedGiftCardMode = watch("giftCardMode");
   const selectedRegions = (regionsQuery.data ?? []).filter((r) =>
     selectedRegionIds?.includes(r.id)
@@ -182,8 +188,23 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
       status: initial.status ?? "PUBLISHED",
       comingSoonRegionIds: initial.comingSoonRegionIds ?? [],
       onSaleRegionIds: initial.onSaleRegionIds ?? [],
-      saleLabel: initial.saleLabel ?? "",
-      saleLabel_ar: initial.saleLabel_ar ?? "",
+      regionSaleLabels: (() => {
+        const fromRegions = initial.regionSaleLabels ?? {};
+        if (Object.keys(fromRegions).length > 0) {
+          return Object.fromEntries(
+            Object.entries(fromRegions).map(([id, v]) => [
+              id,
+              { saleLabel: v?.saleLabel ?? "", saleLabel_ar: v?.saleLabel_ar ?? "" },
+            ])
+          );
+        }
+        const en = initial.saleLabel ?? "";
+        const ar = initial.saleLabel_ar ?? "";
+        if (!en && !ar) return {};
+        return Object.fromEntries(
+          (initial.onSaleRegionIds ?? []).map((id) => [id, { saleLabel: en, saleLabel_ar: ar }])
+        );
+      })(),
       giftCardMode: initial.giftCardMode ?? null,
       draftScope: initial.draftScope ?? "HOME_ONLY",
       deliveryLeadDays: initial.deliveryLeadDays ?? null,
@@ -231,8 +252,20 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
           : [],
       // On sale is orthogonal to status (visual badge) — keep it regardless of draft/published.
       onSaleRegionIds: (values.onSaleRegionIds ?? []).filter((id) => (values.regionIds ?? []).includes(id)),
-      saleLabel: values.saleLabel?.trim() || null,
-      saleLabel_ar: values.saleLabel_ar?.trim() || null,
+      regionSaleLabels: Object.fromEntries(
+        (values.onSaleRegionIds ?? [])
+          .filter((id) => (values.regionIds ?? []).includes(id))
+          .map((id) => {
+            const row = values.regionSaleLabels?.[id];
+            return [
+              id,
+              {
+                saleLabel: row?.saleLabel?.trim() || null,
+                saleLabel_ar: row?.saleLabel_ar?.trim() || null,
+              },
+            ];
+          })
+      ),
       giftCardMode: values.giftCardMode,
       draftScope: values.draftScope,
       deliveryLeadDays: values.deliveryLeadDays,
@@ -410,11 +443,12 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
               }
               return (
                 <div className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-2">
-                    {saleRegions.map((r) => {
-                      const checked = onSaleRegionIds.includes(r.id);
-                      return (
-                        <label key={r.id} className="flex cursor-pointer items-center gap-2.5 text-sm text-ink-800">
+                  {saleRegions.map((r) => {
+                    const checked = onSaleRegionIds.includes(r.id);
+                    const labels = regionSaleLabels[r.id] ?? { saleLabel: "", saleLabel_ar: "" };
+                    return (
+                      <div key={r.id} className="flex flex-col gap-2.5">
+                        <label className="flex cursor-pointer items-center gap-2.5 text-sm text-ink-800">
                           <input
                             type="checkbox"
                             checked={checked}
@@ -423,27 +457,50 @@ export function CategoryForm({ initial, onSubmit, submitLabel, submitting }: Cat
                                 ? [...onSaleRegionIds, r.id]
                                 : onSaleRegionIds.filter((id) => id !== r.id);
                               setValue("onSaleRegionIds", next, { shouldDirty: true });
+                              if (e.target.checked && !regionSaleLabels[r.id]) {
+                                setValue(
+                                  `regionSaleLabels.${r.id}`,
+                                  { saleLabel: "", saleLabel_ar: "" },
+                                  { shouldDirty: true }
+                                );
+                              }
                             }}
                             className="h-4 w-4 rounded border-ink-300 text-bloom-600 focus:ring-bloom-500/30"
                           />
                           <span>{locale === "ar" ? r.name_ar || r.name : r.name}</span>
                         </label>
-                      );
-                    })}
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Input
-                      label={t("admin.categoryForm.saleLabelEn")}
-                      placeholder={t("admin.categoryForm.saleLabelPlaceholder")}
-                      {...register("saleLabel")}
-                    />
-                    <Input
-                      label={t("admin.categoryForm.saleLabelAr")}
-                      placeholder={t("admin.categoryForm.saleLabelPlaceholderAr")}
-                      dir="rtl"
-                      {...register("saleLabel_ar")}
-                    />
-                  </div>
+                        {checked ? (
+                          <div className="ms-6 grid min-w-0 gap-3 sm:grid-cols-2">
+                            <Input
+                              label={t("admin.categoryForm.saleLabelEn")}
+                              placeholder={t("admin.categoryForm.saleLabelPlaceholder")}
+                              value={labels.saleLabel ?? ""}
+                              onChange={(e) =>
+                                setValue(
+                                  `regionSaleLabels.${r.id}`,
+                                  { ...labels, saleLabel: e.target.value },
+                                  { shouldDirty: true }
+                                )
+                              }
+                            />
+                            <Input
+                              label={t("admin.categoryForm.saleLabelAr")}
+                              placeholder={t("admin.categoryForm.saleLabelPlaceholderAr")}
+                              dir="rtl"
+                              value={labels.saleLabel_ar ?? ""}
+                              onChange={(e) =>
+                                setValue(
+                                  `regionSaleLabels.${r.id}`,
+                                  { ...labels, saleLabel_ar: e.target.value },
+                                  { shouldDirty: true }
+                                )
+                              }
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })()}

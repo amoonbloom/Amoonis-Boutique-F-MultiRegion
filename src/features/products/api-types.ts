@@ -206,6 +206,8 @@ export interface ApiProduct {
   saleLabel_ar?: string | null;
   /** Which regions this product is on sale in (staff/edit reads only). */
   onSaleRegionIds?: string[];
+  /** Per-region Sale badge text (staff/edit reads only). Keyed by regionId. */
+  regionSaleLabels?: Record<string, { saleLabel?: string | null; saleLabel_ar?: string | null }>;
   /** Regions this product is visible in. Present on staff reads only. */
   regions?: ApiProductRegionRef[];
   regionIds?: string[];
@@ -318,6 +320,8 @@ export interface ApiProductCreateInput {
   onSaleRegionIds?: string[];
   saleLabel?: string | null;
   saleLabel_ar?: string | null;
+  /** Per-region Sale badge text. Keyed by regionId; blank = default "Sale" for that region. */
+  regionSaleLabels?: Record<string, { saleLabel?: string | null; saleLabel_ar?: string | null }>;
   /** Regions this product should be visible in. Defaults to the default region (UAE) if omitted. */
   regionIds?: string[];
 }

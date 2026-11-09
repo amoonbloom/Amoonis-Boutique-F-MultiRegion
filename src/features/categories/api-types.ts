@@ -32,6 +32,8 @@ export interface ApiCategory {
   saleLabel_ar?: string | null;
   /** Which regions this category is on sale in (staff/edit reads only). */
   onSaleRegionIds?: string[];
+  /** Per-region Sale badge text (staff/edit reads only). Keyed by regionId. */
+  regionSaleLabels?: Record<string, { saleLabel?: string | null; saleLabel_ar?: string | null }>;
   /** Default gift-card input mode for this category's products (null = no default). */
   giftCardMode?: "MESSAGE" | "NAME" | null;
   /** How far a DRAFT status reaches (ignored while PUBLISHED). HOME_ONLY hides the
@@ -103,6 +105,8 @@ export interface ApiCategoryCreateInput {
   onSaleRegionIds?: string[];
   saleLabel?: string | null;
   saleLabel_ar?: string | null;
+  /** Per-region Sale badge text. Keyed by regionId; blank = default "Sale" for that region. */
+  regionSaleLabels?: Record<string, { saleLabel?: string | null; saleLabel_ar?: string | null }>;
   /** Default gift-card mode for the category's products. null/"MESSAGE"/"NAME". */
   giftCardMode?: "MESSAGE" | "NAME" | null;
   /** How far a DRAFT status reaches: HOME_ONLY (default) or ENTIRE_STORE. */
