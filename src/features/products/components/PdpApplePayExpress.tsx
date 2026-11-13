@@ -67,12 +67,10 @@ type ApplePaySessionCtor = {
   STATUS_FAILURE: number;
 };
 
-type PendingExpressOrder = {
-  id: string;
-  isGuest: boolean;
+/** Non-mutating totals for the Apple Pay sheet (order is created only on authorize). */
+type PendingExpressQuote = {
   totalAmount: number;
   currency: string;
-  orderNumber: number | null;
 };
 
 type MoyasarBootstrap = NonNullable<
@@ -125,6 +123,10 @@ function normalizeWalletPhone(raw: string, dialCode: string): string {
   return `${dialCode}${digits}`;
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 /** Official-style Apple logo mark for the black express CTA. */
 function AppleLogoMark({ className }: { className?: string }) {
   return (
@@ -151,6 +153,16 @@ function safeAbortSession(session: ApplePaySessionInstance | null) {
     session.abort();
   } catch {
     /* already closed / unsupported after dismiss */
+  }
+}
+
+/** Best-effort cancel so failed authorize-time orders do not linger in admin. */
+async function abandonQuietly(orderId: string | null | undefined) {
+  if (!orderId) return;
+  try {
+    await ordersApi.abandonUnpaidOrder(orderId);
+  } catch {
+    /* expire-unpaid job is the safety net */
   }
 }
 
@@ -182,7 +194,6 @@ export function PdpApplePayExpress({
   const localize = useLocalizedHref();
   const { t } = useT();
   const token = useAppSelector((s) => s.auth.token);
-  const user = useAppSelector((s) => s.auth.user);
   const selectedCity = useAppSelector((s) => s.location.city);
   const {
     currency,
@@ -206,9 +217,9 @@ export function PdpApplePayExpress({
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [appleOk, setAppleOk] = useState(true);
   const [paying, setPaying] = useState(false);
-  const [orderReady, setOrderReady] = useState(false);
-  const [preparingOrder, setPreparingOrder] = useState(false);
-  const pendingOrderRef = useRef<PendingExpressOrder | null>(null);
+  const [quoteReady, setQuoteReady] = useState(false);
+  const [preparingQuote, setPreparingQuote] = useState(false);
+  const pendingQuoteRef = useRef<PendingExpressQuote | null>(null);
   const sessionBusyRef = useRef(false);
   const activeSessionRef = useRef<ApplePaySessionInstance | null>(null);
   const prepareGenRef = useRef(0);
@@ -234,17 +245,13 @@ export function PdpApplePayExpress({
   });
 
   // Reset / abort whenever the sheet opens or closes so reopen is clean.
-  // Closing must abort any live ApplePaySession — otherwise a second open/close
-  // throws "The object does not support the operation or argument".
   useEffect(() => {
     if (!open) {
       safeAbortSession(activeSessionRef.current);
       activeSessionRef.current = null;
       sessionBusyRef.current = false;
       setPaying(false);
-      setPreparingOrder(false);
-      // Keep pendingOrderRef so a quick reopen can reuse the prepared order
-      // without another create — cleared when fields/items change below.
+      setPreparingQuote(false);
       return;
     }
     setAppleOk(applePaySupported());
@@ -253,15 +260,14 @@ export function PdpApplePayExpress({
     sessionBusyRef.current = false;
     safeAbortSession(activeSessionRef.current);
     activeSessionRef.current = null;
-    // Fresh sheet: re-check order readiness (may already be cached in ref).
-    setOrderReady(Boolean(pendingOrderRef.current));
-    setPreparingOrder(false);
+    setQuoteReady(Boolean(pendingQuoteRef.current));
+    setPreparingQuote(false);
   }, [open]);
 
-  // Changing line items / address means the pre-created order is stale.
+  // Changing line items / address invalidates the quote (no DB order exists yet).
   useEffect(() => {
-    pendingOrderRef.current = null;
-    setOrderReady(false);
+    pendingQuoteRef.current = null;
+    setQuoteReady(false);
   }, [items, shortAddress, streetAddress, selectedCity, deliveryZoneId, countryCode]);
 
   const validateSheetFields = useCallback((): string | null => {
@@ -296,27 +302,10 @@ export function PdpApplePayExpress({
     [dispatch, t]
   );
 
-  const ensureExpressOrder = useCallback(async (): Promise<PendingExpressOrder> => {
-    const existing = pendingOrderRef.current;
-    if (existing) return existing;
-
-    const signedInName = user
-      ? (
-          user.fullName ||
-          user.name ||
-          `${user.firstName ?? ""} ${user.lastName ?? ""}`
-        ).trim()
-      : "";
-    const signedInPhone = user?.phone ? String(user.phone).trim() : "";
-    const signedInEmail = user?.email ? String(user.email).trim() : "";
-
-    const fullName = signedInName || "Apple Pay Guest";
-    const phone = signedInPhone || `${dialCode}500000000`;
-
-    const area = streetAddress.trim() || selectedCity || "Express";
-    const order = await ordersApi.expressCheckout({
-      items,
-      shippingAddress: {
+  const buildShippingAddress = useCallback(
+    (fullName: string, phone: string) => {
+      const area = streetAddress.trim() || selectedCity || "Express";
+      return {
         fullName,
         phone,
         area,
@@ -324,76 +313,81 @@ export function PdpApplePayExpress({
         city: selectedCity || undefined,
         deliveryZoneId: deliveryZoneId || undefined,
         country: countryCode || undefined,
+      };
+    },
+    [streetAddress, selectedCity, deliveryZoneId, countryCode]
+  );
+
+  /**
+   * Non-mutating price preview for the Apple Pay sheet. Safari requires
+   * `new ApplePaySession` inside the click handler with no await, so the total
+   * must already be known — but we must NOT create a DB order until authorize.
+   */
+  const ensureExpressQuote = useCallback(async (): Promise<PendingExpressQuote> => {
+    const existing = pendingQuoteRef.current;
+    if (existing) return existing;
+
+    const quote = await ordersApi.quote({
+      items,
+      shippingAddress: {
+        fullName: "Apple Pay",
+        phone: `${dialCode}500000000`,
+        area: streetAddress.trim() || selectedCity || "Express",
+        streetAddress: streetAddress.trim() || undefined,
+        city: selectedCity || undefined,
+        deliveryZoneId: deliveryZoneId || undefined,
+        country: countryCode || undefined,
       },
-      shortAddress: shortAddressEnabled
-        ? maskShortAddress(shortAddress)
-        : undefined,
-      email: signedInEmail || undefined,
-      paymentMethod: "MOYASAR",
     });
 
-    const isGuest = !token;
-    const snapshot: PendingExpressOrder = {
-      id: order.id,
-      isGuest,
-      totalAmount: Number(order.totalAmount),
-      currency: String(order.currency || currency || "SAR").toUpperCase(),
-      orderNumber: order.orderNumber ?? null,
+    const snapshot: PendingExpressQuote = {
+      totalAmount: round2(Number(quote.totalAmount)),
+      currency: String(quote.currency || currency || "SAR").toUpperCase(),
     };
-    pendingOrderRef.current = snapshot;
-
-    if (isGuest) {
-      try {
-        sessionStorage.setItem(STORAGE_KEYS.guestOrder, JSON.stringify(order));
-      } catch {
-        /* sessionStorage unavailable */
-      }
+    if (!(snapshot.totalAmount > 0)) {
+      throw new Error(t("checkout.orderFailed"));
     }
-    writePendingOnlineOrder(order.id);
+    pendingQuoteRef.current = snapshot;
     return snapshot;
   }, [
-    user,
+    items,
     dialCode,
     streetAddress,
     selectedCity,
-    items,
     deliveryZoneId,
     countryCode,
-    shortAddressEnabled,
-    shortAddress,
-    token,
     currency,
+    t,
   ]);
 
-  // Pre-create the order once sheet fields are valid so the Apple Pay click
-  // handler can construct ApplePaySession synchronously (Safari requirement).
+  // Prefetch quote once sheet fields are valid (still no order row in admin).
   useEffect(() => {
     if (!open || !gated || !appleOk) return;
     if (validateSheetFields() != null) {
-      setPreparingOrder(false);
-      setOrderReady(false);
+      setPreparingQuote(false);
+      setQuoteReady(false);
       return;
     }
-    if (pendingOrderRef.current) {
-      setOrderReady(true);
-      setPreparingOrder(false);
+    if (pendingQuoteRef.current) {
+      setQuoteReady(true);
+      setPreparingQuote(false);
       return;
     }
 
     const gen = ++prepareGenRef.current;
-    setPreparingOrder(true);
-    setOrderReady(false);
-    void ensureExpressOrder()
+    setPreparingQuote(true);
+    setQuoteReady(false);
+    void ensureExpressQuote()
       .then(() => {
         if (prepareGenRef.current !== gen) return;
-        setOrderReady(true);
-        setPreparingOrder(false);
+        setQuoteReady(true);
+        setPreparingQuote(false);
         setFieldError(null);
       })
       .catch((e) => {
         if (prepareGenRef.current !== gen) return;
-        setPreparingOrder(false);
-        setOrderReady(false);
+        setPreparingQuote(false);
+        setQuoteReady(false);
         const message =
           e instanceof ApiError
             ? e.message
@@ -407,7 +401,7 @@ export function PdpApplePayExpress({
     gated,
     appleOk,
     validateSheetFields,
-    ensureExpressOrder,
+    ensureExpressQuote,
     failToast,
     t,
     items,
@@ -419,7 +413,8 @@ export function PdpApplePayExpress({
 
   /**
    * CRITICAL: Apple requires `new ApplePaySession(...)` inside the user-gesture
-   * handler with NO await beforehand. Order must already exist in pendingOrderRef.
+   * handler with NO await beforehand. Quote must already exist in pendingQuoteRef.
+   * Order is created only inside onpaymentauthorized (authorize-then-capture pattern).
    */
   const startApplePay = useCallback(() => {
     if (sessionBusyRef.current || paying) return;
@@ -432,15 +427,14 @@ export function PdpApplePayExpress({
 
     const AP = getApplePaySession();
     const bootstrap = moyasarFormQuery.data as MoyasarBootstrap | undefined;
-    const orderSnap = pendingOrderRef.current;
+    const quoteSnap = pendingQuoteRef.current;
     if (!AP || !applePaySupported() || !bootstrap) {
       failToast(t("product.applePayUnsupported"));
       return;
     }
-    if (!orderSnap) {
-      // Still preparing — kick another prepare and ask the shopper to tap again.
-      void ensureExpressOrder()
-        .then(() => setOrderReady(true))
+    if (!quoteSnap) {
+      void ensureExpressQuote()
+        .then(() => setQuoteReady(true))
         .catch(() => undefined);
       failToast(t("checkout.moyasarFormLoading"));
       return;
@@ -452,10 +446,10 @@ export function PdpApplePayExpress({
 
     const version =
       typeof AP.supportsVersion === "function" && AP.supportsVersion(7) ? 7 : 6;
-    const amount = Number(orderSnap.totalAmount).toFixed(2);
+    const amount = Number(quoteSnap.totalAmount).toFixed(2);
     const paymentRequest = {
       countryCode: bootstrap.applePay?.country || "SA",
-      currencyCode: orderSnap.currency,
+      currencyCode: quoteSnap.currency,
       supportedNetworks: mapSupportedNetworks(bootstrap.supportedNetworks),
       merchantCapabilities: ["supports3DS", "supportsCredit", "supportsDebit"],
       total: {
@@ -466,13 +460,11 @@ export function PdpApplePayExpress({
       requiredShippingContactFields: ["name", "phone", "email"],
     };
 
-    // Abort any leftover session before starting a new one (reopen safety).
     safeAbortSession(activeSessionRef.current);
     activeSessionRef.current = null;
 
     let session: ApplePaySessionInstance;
     try {
-      // Must stay synchronous — this is the user-gesture boundary Safari enforces.
       session = new AP(version, paymentRequest);
       activeSessionRef.current = session;
     } catch (e) {
@@ -540,23 +532,52 @@ export function PdpApplePayExpress({
         return;
       }
 
+      let createdOrderId: string | null = null;
       try {
-        await ordersApi.updateExpressContact(orderSnap.id, {
-          fullName,
-          phone,
+        // Authorize-then-create: first durable write happens here, with real Wallet contact.
+        const order = await ordersApi.expressCheckout({
+          items,
+          shippingAddress: buildShippingAddress(fullName, phone),
+          shortAddress: shortAddressEnabled
+            ? maskShortAddress(shortAddress)
+            : undefined,
           email,
+          paymentMethod: "MOYASAR",
         });
+        createdOrderId = order.id;
 
-        const amountMinor = Math.max(
-          100,
-          Math.round(Number(orderSnap.totalAmount) * 100)
-        );
+        const orderTotal = round2(Number(order.totalAmount));
+        const sheetTotal = round2(Number(quoteSnap.totalAmount));
+        if (Math.abs(orderTotal - sheetTotal) > 0.05) {
+          await abandonQuietly(createdOrderId);
+          createdOrderId = null;
+          try {
+            session.completePayment(AP.STATUS_FAILURE);
+          } catch {
+            /* already closed */
+          }
+          clearBusy();
+          failToast(t("checkout.moyasarPayFailed"));
+          return;
+        }
+
+        const isGuest = !token;
+        if (isGuest) {
+          try {
+            sessionStorage.setItem(STORAGE_KEYS.guestOrder, JSON.stringify(order));
+          } catch {
+            /* sessionStorage unavailable */
+          }
+        }
+        writePendingOnlineOrder(order.id);
+
+        const amountMinor = Math.max(100, Math.round(orderTotal * 100));
         const payRes = await fetch(MOYASAR_PAYMENTS_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: amountMinor,
-            currency: orderSnap.currency,
+            currency: String(order.currency || quoteSnap.currency).toUpperCase(),
             description: t("checkout.moyasarCheckoutDescription"),
             publishable_api_key: bootstrap.publishableApiKey,
             source: {
@@ -564,11 +585,9 @@ export function PdpApplePayExpress({
               token: event.payment.token,
             },
             metadata: {
-              order_id: orderSnap.id,
+              order_id: order.id,
               order_number:
-                orderSnap.orderNumber != null
-                  ? String(orderSnap.orderNumber)
-                  : orderSnap.id,
+                order.orderNumber != null ? String(order.orderNumber) : order.id,
             },
           }),
         });
@@ -577,9 +596,12 @@ export function PdpApplePayExpress({
           status?: string;
           message?: string;
           type?: string;
+          source?: { message?: string };
         };
 
         if (!payRes.ok || !payment?.id || payment.status !== "paid") {
+          await abandonQuietly(createdOrderId);
+          createdOrderId = null;
           try {
             session.completePayment(AP.STATUS_FAILURE);
           } catch {
@@ -587,20 +609,23 @@ export function PdpApplePayExpress({
           }
           clearBusy();
           failToast(
-            payment?.message || payment?.type || t("checkout.moyasarPayFailed")
+            payment?.source?.message ||
+              payment?.message ||
+              payment?.type ||
+              t("checkout.moyasarPayFailed")
           );
           return;
         }
 
-        if (orderSnap.isGuest) {
-          await ordersApi.attachMoyasarGuestPayment(orderSnap.id, payment.id);
+        if (isGuest) {
+          await ordersApi.attachMoyasarGuestPayment(order.id, payment.id);
         } else {
-          await ordersApi.attachMoyasarPayment(orderSnap.id, payment.id);
+          await ordersApi.attachMoyasarPayment(order.id, payment.id);
         }
 
         const confirm = await ordersApi.confirmMoyasarPayment({
           paymentId: payment.id,
-          orderId: orderSnap.id,
+          orderId: order.id,
         });
 
         try {
@@ -613,20 +638,21 @@ export function PdpApplePayExpress({
 
         if (confirm.isPaid) {
           const qs = new URLSearchParams();
-          qs.set("id", orderSnap.id);
-          if (orderSnap.isGuest) qs.set("guest", "1");
+          qs.set("id", order.id);
+          if (isGuest) qs.set("guest", "1");
           router.push(localize(`${ROUTES.orderSuccess}?${qs.toString()}`));
           return;
         }
 
         const returnQs = new URLSearchParams();
-        returnQs.set("oid", orderSnap.id);
+        returnQs.set("oid", order.id);
         returnQs.set("id", payment.id);
-        if (orderSnap.isGuest) returnQs.set("guest", "1");
+        if (isGuest) returnQs.set("guest", "1");
         router.push(
           localize(`${ROUTES.orderMoyasarReturn}?${returnQs.toString()}`)
         );
       } catch (e) {
+        await abandonQuietly(createdOrderId);
         try {
           session.completePayment(AP.STATUS_FAILURE);
         } catch {
@@ -661,11 +687,16 @@ export function PdpApplePayExpress({
     failToast,
     moyasarFormQuery.data,
     t,
-    ensureExpressOrder,
+    ensureExpressQuote,
     dialCode,
     onClose,
     router,
     localize,
+    items,
+    buildShippingAddress,
+    shortAddressEnabled,
+    shortAddress,
+    token,
   ]);
 
   if (!gated) return null;
@@ -674,8 +705,8 @@ export function PdpApplePayExpress({
   const ctaDisabled = personalizationBusy || !product.inStock || product.comingSoon;
   const payDisabled =
     paying ||
-    preparingOrder ||
-    !orderReady ||
+    preparingQuote ||
+    !quoteReady ||
     !appleOk ||
     !bootstrap ||
     moyasarFormQuery.isLoading;
@@ -708,7 +739,6 @@ export function PdpApplePayExpress({
       <Modal
         open={open}
         onClose={() => {
-          // Abort before unmount so Apple's session isn't torn down uncleanly.
           safeAbortSession(activeSessionRef.current);
           activeSessionRef.current = null;
           sessionBusyRef.current = false;
@@ -759,15 +789,11 @@ export function PdpApplePayExpress({
             </p>
           ) : null}
 
-          {appleOk && preparingOrder ? (
+          {appleOk && preparingQuote ? (
             <p className="text-sm text-ink-500">{t("checkout.moyasarFormLoading")}</p>
           ) : null}
 
-          {/* Use our own button — Apple's <apple-pay-button> custom element throws
-              "object does not support the operation or argument" when React
-              unmounts it on modal close/reopen. ApplePaySession still runs from
-              this click (user-gesture safe). */}
-          {appleOk && bootstrap && !preparingOrder ? (
+          {appleOk && bootstrap && !preparingQuote ? (
             <button
               type="button"
               disabled={payDisabled}
