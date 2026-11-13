@@ -61,6 +61,38 @@ export const ordersApi = {
     return data.data;
   },
 
+  /**
+   * Price items WITHOUT creating an order (shipping + VAT + optional cash).
+   * Used for the Apple Pay sheet total before authorize-time order create.
+   */
+  async quote(payload: {
+    items: ApiExpressCheckoutInput["items"];
+    shippingAddress?: ApiExpressCheckoutInput["shippingAddress"];
+    promoCode?: string;
+  }): Promise<{
+    totalAmount: number;
+    currency: string;
+    subtotalAmount: number;
+    shippingAmount: number;
+    taxAmount: number;
+  }> {
+    const { data } = await http.post<
+      ApiResponse<{
+        totalAmount: number;
+        currency: string;
+        subtotalAmount: number;
+        shippingAmount: number;
+        taxAmount: number;
+      }>
+    >("/orders/quote", payload);
+    return data.data;
+  },
+
+  /** Cancel an unpaid online order after Apple Pay / card failure (clears admin orphans). */
+  async abandonUnpaidOrder(orderId: string): Promise<void> {
+    await http.post(`/orders/${orderId}/abandon-unpaid`);
+  },
+
   /** Overwrite shipping/guest contact from Apple Pay Wallet after authorization. */
   async updateExpressContact(
     orderId: string,
